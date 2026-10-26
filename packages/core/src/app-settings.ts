@@ -14,6 +14,9 @@ interface FieldBase {
 }
 export type AppSettingField =
   | (FieldBase & { type: "text" | "longtext"; default?: string; maxLength?: number })
+  /** M18: a value the app uses (a key, a token) that a host never shows back or logs — see
+   *  `redactSettings` and `keepSecrets`. No default: an empty secret is "not set". */
+  | (FieldBase & { type: "secret"; maxLength?: number })
   | (FieldBase & { type: "boolean"; default?: boolean })
   | (FieldBase & { type: "select"; options: string[]; default?: string });
 
@@ -44,6 +47,7 @@ export type ResolvedSettings = { ok: true; settings: AppSettings } | { ok: false
 function defaultFor(field: AppSettingField): AppSettingValue {
   if (field.type === "boolean") return field.default ?? false;
   if (field.type === "select") return field.default ?? field.options[0] ?? "";
+  if (field.type === "secret") return "";
   return field.default ?? "";
 }
 
@@ -83,4 +87,29 @@ export function resolveSettings(definition: Pick<WappyAppDefinition, "settings">
     else settings[f.key] = raw;
   }
   return errors.length ? { ok: false, errors } : { ok: true, settings };
+}
+
+/** What a host shows (or logs) in place of a secret that is set. */
+export const SECRET_MASK = "••••••••";
+
+const secretKeys = (definition: Pick<WappyAppDefinition, "settings">) => new Set((definition.settings ?? []).filter((f) => f.type === "secret").map((f) => f.key));
+
+/**
+ * M18: a copy of the settings that is safe to send to a settings form or a log: every secret that is
+ * set becomes `SECRET_MASK`, an empty one stays empty (so a form can show "not set").
+ */
+export function redactSettings(definition: Pick<WappyAppDefinition, "settings">, settings: Record<string, unknown>): Record<string, unknown> {
+  const secret = secretKeys(definition);
+  return Object.fromEntries(Object.entries(settings).map(([k, v]) => [k, secret.has(k) && typeof v === "string" && v !== "" ? SECRET_MASK : v]));
+}
+
+/**
+ * M18: what to store when a settings form is saved. A form only ever had the mask, so a secret that
+ * comes back as the mask (or not at all) keeps its stored value; anything else replaces it. Run
+ * `resolveSettings` on the result as usual.
+ */
+export function keepSecrets(definition: Pick<WappyAppDefinition, "settings">, stored: Record<string, unknown>, incoming: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...incoming };
+  for (const k of secretKeys(definition)) if ((out[k] === undefined || out[k] === SECRET_MASK) && stored[k] !== undefined) out[k] = stored[k];
+  return out;
 }
