@@ -110,6 +110,10 @@ export function redactSettings(definition: Pick<WappyAppDefinition, "settings">,
  */
 export function keepSecrets(definition: Pick<WappyAppDefinition, "settings">, stored: Record<string, unknown>, incoming: Record<string, unknown>): Record<string, unknown> {
   const out = { ...incoming };
-  for (const k of secretKeys(definition)) if ((out[k] === undefined || out[k] === SECRET_MASK) && stored[k] !== undefined) out[k] = stored[k];
+  for (const k of secretKeys(definition)) {
+    // The mask with nothing stored behind it means "not set" — never save the mask itself.
+    if (out[k] === SECRET_MASK) out[k] = stored[k] ?? "";
+    else if (out[k] === undefined && stored[k] !== undefined) out[k] = stored[k];
+  }
   return out;
 }

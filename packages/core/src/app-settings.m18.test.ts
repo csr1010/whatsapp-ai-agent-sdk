@@ -31,4 +31,14 @@ describe("M18: secret settings — usable by the app, never shown back or logged
     expect(keepSecrets(def, stored, { url: "http://b", key: SECRET_MASK })).toEqual({ url: "http://b", key: "old-key", spare: "old-spare" });
     expect(keepSecrets(def, stored, { key: "new-key", spare: "" })).toEqual({ key: "new-key", spare: "" });
   });
+
+  test("the mask with nothing stored behind it is saved as not set, never as the mask itself", () => {
+    expect(keepSecrets(def, {}, { key: SECRET_MASK })).toEqual({ key: "" });
+    expect(resolveSettings(def, keepSecrets(def, {}, { key: SECRET_MASK }))).toEqual({ ok: true, settings: { url: "", key: "", spare: "" } });
+  });
+
+  test("an app with no settings: both helpers pass values through", () => {
+    expect(redactSettings({}, { a: "x" })).toEqual({ a: "x" });
+    expect(keepSecrets({}, { a: "old" }, { a: "new" })).toEqual({ a: "new" });
+  });
 });

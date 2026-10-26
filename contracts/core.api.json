@@ -119,6 +119,10 @@
     "kind": "TypeAliasDeclaration",
     "type": "JsonSchema"
   },
+  "keepSecrets": {
+    "kind": "FunctionDeclaration",
+    "type": "(definition: Pick<WappyAppDefinition, \"settings\">, stored: Record<string, unknown>, incoming: Record<string, unknown>) => Record<string, unknown>"
+  },
   "LoadResult": {
     "kind": "TypeAliasDeclaration",
     "type": "LoadResult"
@@ -191,6 +195,10 @@
     "kind": "FunctionDeclaration",
     "type": "(path: string) => unknown"
   },
+  "redactSettings": {
+    "kind": "FunctionDeclaration",
+    "type": "(definition: Pick<WappyAppDefinition, \"settings\">, settings: Record<string, unknown>) => Record<string, unknown>"
+  },
   "RegistryConfig": {
     "kind": "InterfaceDeclaration",
     "type": "RegistryConfig"
@@ -250,6 +258,10 @@
   "satisfiesRange": {
     "kind": "FunctionDeclaration",
     "type": "(version: string, range: string) => boolean"
+  },
+  "SECRET_MASK": {
+    "kind": "VariableDeclaration",
+    "type": "\"••••••••\""
   },
   "SessionProfile": {
     "kind": "TypeAliasDeclaration",
