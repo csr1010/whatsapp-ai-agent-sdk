@@ -1,6 +1,6 @@
 # @wappy_ai/harness
 
-The agent itself, for [Wappy](https://github.com/csr1010/wappy-kit): routing, memory, session
+The agent itself, for [Wappy](https://github.com/csr1010/whatsapp-ai-agent-sdk): routing, memory, session
 profile, local RAG, and reply-format reasoning. Bring your own model — it works with any provider
 the [Vercel AI SDK](https://sdk.vercel.ai/) supports (OpenAI, Anthropic, Gemini, local Ollama).
 
@@ -27,7 +27,7 @@ npm install @wappy_ai/harness
 - **Router** (`createLlmRouter`) — a lightweight classification step that decides whether a
   message needs a tool call, RAG lookup, or neither, before anything expensive runs.
 
-See the [main repo](https://github.com/csr1010/wappy-kit) for the full picture.
+See the [main repo](https://github.com/csr1010/whatsapp-ai-agent-sdk) for the full picture.
 
 ## License
 

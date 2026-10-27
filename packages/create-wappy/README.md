@@ -1,6 +1,6 @@
 # @wappy_ai/create-agent
 
-The installer for [Wappy](https://github.com/csr1010/wappy-kit) — an open-source SDK for building
+The installer for [Wappy](https://github.com/csr1010/whatsapp-ai-agent-sdk) — an open-source SDK for building
 AI agents on WhatsApp. Your own model, your own number, your own data. Nothing routes through a
 server we run.
 
@@ -40,7 +40,7 @@ npm create @wappy_ai/agent -- --yes --model anthropic --memory local --productiv
 - **An optional sample agent** — a Gmail/Calendar assistant, answering any question in plain
   language, read-only, no saved tasks or fixed command list.
 
-See the [main repo README](https://github.com/csr1010/wappy-kit) for the full pitch, and your own
+See the [main repo README](https://github.com/csr1010/whatsapp-ai-agent-sdk) for the full pitch, and your own
 generated project's `README.md`/`WHATSAPP_SETUP.md` for exact next steps once it's created.
 
 ## License

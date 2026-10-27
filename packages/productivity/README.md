@@ -1,6 +1,6 @@
 # @wappy_ai/productivity
 
-The sample Gmail/Calendar assistant that ships with [Wappy](https://github.com/csr1010/wappy-kit).
+The sample Gmail/Calendar assistant that ships with [Wappy](https://github.com/csr1010/whatsapp-ai-agent-sdk).
 Answers any question about your Gmail or Calendar in plain language — no saved tasks, no fixed
 command list, no cron, and no WhatsApp Message Template required, since every reply is a direct
 response to an inbound message.
@@ -32,7 +32,7 @@ Requires [`@wappy_ai/connector-google`](https://www.npmjs.com/package/@wappy_ai/
 for the real OAuth + API calls. You bring your own Google Cloud OAuth client — connected from a
 local "Connect Google" page this package serves, one click, not a CLI command.
 
-See the [main repo](https://github.com/csr1010/wappy-kit) for the full picture.
+See the [main repo](https://github.com/csr1010/whatsapp-ai-agent-sdk) for the full picture.
 
 ## License
 

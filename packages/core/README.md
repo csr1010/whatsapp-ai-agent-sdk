@@ -1,6 +1,6 @@
 # @wappy_ai/core
 
-The shared contracts that the rest of [Wappy](https://github.com/csr1010/wappy-kit) is built on:
+The shared contracts that the rest of [Wappy](https://github.com/csr1010/whatsapp-ai-agent-sdk) is built on:
 `Tool`, `Memory`, `MessageChannel`, `SmartMessage`, `Clock`, and the other interfaces every other
 `@wappy_ai/*` package implements or consumes. Zero dependency on any specific model provider,
 channel, or storage backend — those live in the packages that implement these interfaces.
@@ -13,7 +13,7 @@ on its own if you're implementing a new connector or storage backend against the
 npm install @wappy_ai/core
 ```
 
-See the [main repo](https://github.com/csr1010/wappy-kit) for the full picture of how this fits
+See the [main repo](https://github.com/csr1010/whatsapp-ai-agent-sdk) for the full picture of how this fits
 together.
 
 ## License

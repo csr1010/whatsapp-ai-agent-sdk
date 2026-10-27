@@ -1,8 +1,8 @@
-# Wappy
+# Wappy — AI agent SDK for WhatsApp
 
 ### Build a real AI agent on WhatsApp, running on your own machine, in under a minute.
 
-[![CI](https://github.com/csr1010/wappy-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/csr1010/wappy-kit/actions/workflows/ci.yml)
+[![CI](https://github.com/csr1010/whatsapp-ai-agent-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/csr1010/whatsapp-ai-agent-sdk/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![npm](https://img.shields.io/npm/v/%40wappy_ai%2Fcreate-agent?label=%40wappy_ai%2Fcreate-agent)](https://www.npmjs.com/package/@wappy_ai/create-agent)
 [![Local-first](https://img.shields.io/badge/local--first-%E2%9C%94-brightgreen)](#why-now)

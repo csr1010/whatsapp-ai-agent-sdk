@@ -1,6 +1,6 @@
 # @wappy_ai/whatsapp
 
-A real WhatsApp Cloud API integration, for [Wappy](https://github.com/csr1010/wappy-kit): webhook
+A real WhatsApp Cloud API integration, for [Wappy](https://github.com/csr1010/whatsapp-ai-agent-sdk): webhook
 signature verification and parsing, message rendering, delivery retries, and the 24-hour
 session-window rule — the parts of WhatsApp integration that are easy to get subtly wrong, done
 once and correctly.
@@ -27,7 +27,7 @@ You'll need your own WhatsApp Cloud API app (free, via
 [Meta's developer portal](https://developers.facebook.com/apps)) — this package never operates a
 shared app on your behalf.
 
-See the [main repo](https://github.com/csr1010/wappy-kit) for the full picture.
+See the [main repo](https://github.com/csr1010/whatsapp-ai-agent-sdk) for the full picture.
 
 ## License
 

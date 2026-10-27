@@ -5,12 +5,12 @@
     "node": ">=22"
   },
   "description": "Wappy: the open-source AI agent SDK for WhatsApp. Bring your own model, your own number, your own data. Local-first, no forced cloud, no vendor lock-in.",
-  "homepage": "https://github.com/csr1010/wappy-kit#readme",
+  "homepage": "https://github.com/csr1010/whatsapp-ai-agent-sdk#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/csr1010/wappy-kit.git"
+    "url": "git+https://github.com/csr1010/whatsapp-ai-agent-sdk.git"
   },
-  "bugs": "https://github.com/csr1010/wappy-kit/issues",
+  "bugs": "https://github.com/csr1010/whatsapp-ai-agent-sdk/issues",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@12.5.1",

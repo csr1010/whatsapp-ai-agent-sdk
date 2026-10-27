@@ -2,7 +2,7 @@
 
 Bring-your-own [Cognee](https://www.cognee.ai/) instance (self-hosted or cloud) as the
 Knowledge/RAG backend for [`@wappy_ai/harness`](https://www.npmjs.com/package/@wappy_ai/harness),
-part of [Wappy](https://github.com/csr1010/wappy-kit). Instead of local keyword/BM25 matching,
+part of [Wappy](https://github.com/csr1010/whatsapp-ai-agent-sdk). Instead of local keyword/BM25 matching,
 Cognee builds a knowledge graph of entities and relationships as you ingest data, and keeps
 refining it over repeated ingests.
 
@@ -26,7 +26,7 @@ You need your own running Cognee instance — self-hosted (Docker or `pip instal
 required) or Cognee Cloud. See the generated project's own `COGNEE_SETUP.md` for real, tested
 setup steps for all three paths, including how to get an API key.
 
-See the [main repo](https://github.com/csr1010/wappy-kit) for the full picture.
+See the [main repo](https://github.com/csr1010/whatsapp-ai-agent-sdk) for the full picture.
 
 ## License
 

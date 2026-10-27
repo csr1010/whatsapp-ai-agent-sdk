@@ -11,13 +11,13 @@
     "rag",
     "typescript"
   ],
-  "homepage": "https://github.com/csr1010/wappy-kit#readme",
+  "homepage": "https://github.com/csr1010/whatsapp-ai-agent-sdk#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/csr1010/wappy-kit.git",
+    "url": "git+https://github.com/csr1010/whatsapp-ai-agent-sdk.git",
     "directory": "packages/connector-cognee"
   },
-  "bugs": "https://github.com/csr1010/wappy-kit/issues",
+  "bugs": "https://github.com/csr1010/whatsapp-ai-agent-sdk/issues",
   "license": "MIT",
   "engines": {
     "node": ">=22"

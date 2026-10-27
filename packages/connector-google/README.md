@@ -2,7 +2,7 @@
 
 Bring-your-own Google Cloud OAuth, for
 [`@wappy_ai/productivity`](https://www.npmjs.com/package/@wappy_ai/productivity)'s Gmail/Calendar
-assistant in [Wappy](https://github.com/csr1010/wappy-kit). Real, parameterized Calendar and Gmail
+assistant in [Wappy](https://github.com/csr1010/whatsapp-ai-agent-sdk). Real, parameterized Calendar and Gmail
 search — no fabricated data, no shared Wappy-operated Google app.
 
 Included automatically when you answer "yes" to the productivity question in
@@ -23,7 +23,7 @@ npm install @wappy_ai/connector-google
 You create your own Google Cloud project and OAuth client — see the generated project's own
 `GOOGLE_SETUP.md` for the exact click-by-click steps.
 
-See the [main repo](https://github.com/csr1010/wappy-kit) for the full picture.
+See the [main repo](https://github.com/csr1010/whatsapp-ai-agent-sdk) for the full picture.
 
 ## License
 
