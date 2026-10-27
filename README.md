@@ -8,6 +8,10 @@
 [![Local-first](https://img.shields.io/badge/local--first-%E2%9C%94-brightgreen)](#why-now)
 
 <p align="center">
+  <img src="docs/images/hero.png" alt="Build your own WhatsApp AI agent: an open-source SDK to build, customize and deploy AI agents on WhatsApp in minutes. Get started with npm create @wappy_ai/agent" width="560">
+</p>
+
+<p align="center">
   <img src="docs/images/products-demo.gif" alt="An agent built with the SDK replying to 'Show me ur products' on WhatsApp" width="100%">
 </p>
 
