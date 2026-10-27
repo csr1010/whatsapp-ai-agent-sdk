@@ -1,4 +1,4 @@
-# Wappy — AI agent SDK for WhatsApp
+# WhatsApp AI Agent SDK
 
 ### Build a real AI agent on WhatsApp, running on your own machine, in under a minute.
 
@@ -8,11 +8,11 @@
 [![Local-first](https://img.shields.io/badge/local--first-%E2%9C%94-brightgreen)](#why-now)
 
 <p align="center">
-  <img src="docs/images/products-demo.gif" alt="Wappy agent replying to 'Show me ur products' on WhatsApp" width="100%">
+  <img src="docs/images/products-demo.gif" alt="An agent built with the SDK replying to 'Show me ur products' on WhatsApp" width="100%">
 </p>
 
 <p align="center">
-  <img src="docs/images/calendar-demo.png" alt="Wappy agent answering 'Whats on my calendar this week' on WhatsApp" width="100%">
+  <img src="docs/images/calendar-demo.png" alt="An agent built with the SDK answering 'Whats on my calendar this week' on WhatsApp" width="100%">
 </p>
 
 Free. Open source. No account with us, ever. Your conversations, your memory, your data stay in
@@ -62,7 +62,7 @@ $ npm create @wappy_ai/agent
 Done — 7 file(s) written in ./my-agent.
 ```
 
-A few questions, then a working agent. No credit card, no signup for Wappy itself, nothing
+A few questions, then a working agent. No credit card, no signup for the SDK itself, nothing
 phoning home.
 
 ## Personal use cases
