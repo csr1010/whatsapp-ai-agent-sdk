@@ -61,3 +61,41 @@ describe("M19: the agent passes history to invokeTools and puts its standing ins
     expect(systems.at(-1)!.startsWith("If the user's request is genuinely unrelated")).toBe(true);
   });
 });
+
+describe("M19 T19.3: a valid reply survives extras that don't validate", () => {
+  test("nested facts and an over-long rationale are dropped; the reply is sent", async () => {
+    const sent: unknown[] = [];
+    const model: Model = { generate: async () => ({ structured: { message: { text: "Golden Terra is in Kothur." }, sessionFacts: { place: "Golden Terra", detail: { a: 1 } }, formatRationale: "x".repeat(400) } }) };
+    const agent = createAgent({
+      channel: { name: "test", receive: () => [], send: async (_to, m) => { sent.push(m); return { status: "sent" }; } },
+      memory: fakeMemory(), router: fakeRouter([{ ...NEEDS_TOOL, needsTool: false }]), model, clock: systemClock, tracer: createInMemoryTracer(),
+    });
+    await agent.handle(msg("m1", "where is Golden Terra?"));
+    expect(sent).toEqual([{ text: "Golden Terra is in Kothur." }]);
+  });
+
+  test.each([
+    ["no object at all", "nope"],
+    ["an invalid message", { message: { buttons: "x" }, formatRationale: 5 }],
+  ])("nothing to salvage (%s) → the honest fallback", async (_label, structured) => {
+    const sent: { text?: string }[] = [];
+    const model: Model = { generate: async () => ({ structured }) };
+    const agent = createAgent({
+      channel: { name: "test", receive: () => [], send: async (_to, m) => { sent.push(m); return { status: "sent" }; } },
+      memory: fakeMemory(), router: fakeRouter([{ ...NEEDS_TOOL, needsTool: false }]), model, clock: systemClock, tracer: createInMemoryTracer(),
+    });
+    await agent.handle(msg("m1", "hi"));
+    expect(sent[0]?.text).toMatch(/trouble/);
+  });
+
+  test("usable extras are kept: string state and summary, facts as an array are dropped", async () => {
+    const model: Model = { generate: async () => ({ structured: { message: { text: "ok" }, sessionFacts: ["a"], sessionCurrentState: "choosing", sessionSummary: "asked", formatRationale: "y".repeat(301) } }) };
+    const sent: unknown[] = [];
+    const agent = createAgent({
+      channel: { name: "test", receive: () => [], send: async (_to, m) => { sent.push(m); return { status: "sent" }; } },
+      memory: fakeMemory(), router: fakeRouter([{ ...NEEDS_TOOL, needsTool: false }]), model, clock: systemClock, tracer: createInMemoryTracer(),
+    });
+    await agent.handle(msg("m1", "hi"));
+    expect(sent).toEqual([{ text: "ok" }]);
+  });
+});

@@ -72,6 +72,27 @@ export interface ComposeWithBudgetResult {
  * only make an oversized prompt worse). Still degrades to whatever text either attempt produced,
  * or an honest fallback, never a crash or a silent reply (§10).
  */
+const str = (v: unknown, max = Infinity): string | undefined => (typeof v === "string" && v.trim() ? v.slice(0, max) : undefined);
+
+/** The reply out of a response whose wrapper didn't validate: `message` must be a valid SmartMessage;
+ * each extra is kept only if it's usable, and only string-valued facts are kept. */
+function salvage(structured: unknown): Pick<ComposeWithBudgetResult, "reply" | "formatRationale" | "sessionFacts" | "sessionCurrentState" | "sessionSummary"> | undefined {
+  if (!structured || typeof structured !== "object") return undefined;
+  const s = structured as Record<string, unknown>;
+  const message = SmartMessageSchema.safeParse(s.message);
+  if (!message.success) return undefined;
+  const facts = s.sessionFacts && typeof s.sessionFacts === "object" && !Array.isArray(s.sessionFacts)
+    ? Object.fromEntries(Object.entries(s.sessionFacts).filter((e): e is [string, string] => typeof e[1] === "string"))
+    : undefined;
+  return {
+    reply: message.data,
+    formatRationale: str(s.formatRationale, 300) ?? FALLBACK_RATIONALE,
+    ...(facts && Object.keys(facts).length ? { sessionFacts: facts } : {}),
+    ...(str(s.sessionCurrentState) ? { sessionCurrentState: str(s.sessionCurrentState) } : {}),
+    ...(str(s.sessionSummary) ? { sessionSummary: str(s.sessionSummary) } : {}),
+  };
+}
+
 export async function composeWithBudget(opts: ComposeWithBudgetOptions): Promise<ComposeWithBudgetResult> {
   let budget = opts.budget;
   let input = opts.input;
@@ -98,6 +119,10 @@ export async function composeWithBudget(opts: ComposeWithBudgetOptions): Promise
           shrunkForContextLength,
         };
       }
+      // M19 T19.3: a valid reply is kept even when only the extras around it are off (facts that
+      // aren't plain strings, an over-long rationale) — they're nice to have; the reply is the point.
+      const salvaged = salvage(result.structured);
+      if (salvaged) return { ...salvaged, usage: assembled.usage, dropped: assembled.dropped, shrunkForContextLength };
       input = { ...opts.input, userMessage: opts.input.userMessage + REPAIR_NOTE };
     } catch (e) {
       if (isContextLengthError(e)) {
