@@ -87,7 +87,7 @@ export async function routeAndCompose(message: InboundMessage, effectiveText: st
       trace(deps.tracer, "tools", "invoke");
       // Uses the same bounded/truncated text every other consumer (router, RAG query, selectTools,
       // the persisted turn) already uses — not the raw, unbounded message.
-      const findings = await safeCall(() => deps.invokeTools!({ message: { ...message, text: effectiveText }, decision }), []);
+      const findings = await safeCall(() => deps.invokeTools!({ message: { ...message, text: effectiveText }, decision, history }), []);
       toolFindings.push(...findings.map((f) => `Tool result: ${f}`));
     }
     if (deps.tools && deps.tools.length > 0) {
@@ -111,7 +111,7 @@ export async function routeAndCompose(message: InboundMessage, effectiveText: st
   const composed = await composeWithBudget({
     model: deps.model,
     input: {
-      system: `${SCOPE_GUARDRAIL}\n\n${FORMAT_REASONING}\n\n${GROUNDING_HONESTY}`,
+      system: [deps.instructions?.trim(), SCOPE_GUARDRAIL, FORMAT_REASONING, GROUNDING_HONESTY].filter(Boolean).join("\n\n"),
       sessionProfile: renderSessionProfile(sessionProfile),
       skillFragments,
       toolSchemas,

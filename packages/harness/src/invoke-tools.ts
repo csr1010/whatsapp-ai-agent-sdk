@@ -1,4 +1,4 @@
-import type { InboundMessage, JsonSchema, Model, RouterDecision, Tool } from "@wappy_ai/core";
+import type { InboundMessage, JsonSchema, Model, RouterDecision, Tool, Turn } from "@wappy_ai/core";
 import { selectTools } from "./tool-selector.js";
 import { boundToolResult, type BoundToolResultOptions } from "./bound-tool-result.js";
 import type { TokenEstimator } from "./context-budget.js";
@@ -24,7 +24,16 @@ export interface CreateToolInvokerOptions {
    * silent gap — the tool is simply never executed, with an honest finding explaining why, rather
    * than skipping the safety gate the app author presumably wanted by marking it confirmBefore. */
   confirmFlow?: ConfirmFlow;
+  /** M19: how many earlier turns the tool choice sees besides the latest message. A request often
+   * spans turns ("book a visit" → "Saturday" → "Ravi"), and "there" or "that one" only make sense
+   * with what came before — from the last message alone, the tool is missed or called with half its
+   * arguments. Default 4; 0 = the latest message only (the behaviour before M19). */
+  contextTurns?: number;
 }
+
+const DEFAULT_CONTEXT_TURNS = 4;
+/** Each earlier turn is cut to this before it joins the tool-choice prompt — context, not a transcript. */
+const MAX_CONTEXT_TURN_CHARS = 500;
 
 const DEFAULT_MAX_SCHEMA_TOKENS = 1000;
 const DEFAULT_BOUND_OPTIONS: BoundToolResultOptions = { maxBytes: 2000, maxArrayItems: 10 };
@@ -75,16 +84,27 @@ function failureFinding(toolName: string, error: string): string {
  * and returns its bounded result (T6.6's `boundToolResult`, finally given a real caller) as a single
  * finding string fed into the final compose call — the same shape `retrieveRag`'s snippets take.
  */
-export function createToolInvoker(opts: CreateToolInvokerOptions): (input: { message: InboundMessage; decision: RouterDecision }) => Promise<string[]> {
+/** The last `n` turns with text, oldest first, as `user: …` / `agent: …` lines. */
+function recentLines(history: Turn[] | undefined, n: number): string[] {
+  if (!history || n <= 0) return [];
+  return history
+    .filter((t) => t.text && t.role !== "system")
+    .slice(-n)
+    .map((t) => `${t.role}: ${t.text!.slice(0, MAX_CONTEXT_TURN_CHARS)}`);
+}
+
+export function createToolInvoker(opts: CreateToolInvokerOptions): (input: { message: InboundMessage; decision: RouterDecision; history?: Turn[] }) => Promise<string[]> {
   const boundOptions = opts.boundOptions ?? DEFAULT_BOUND_OPTIONS;
 
-  return async ({ message }) => {
+  return async ({ message, history }) => {
     const query = message.text ?? "";
-    const selected = selectTools({ tools: opts.tools, message: query, maxTokens: opts.maxSchemaTokens ?? DEFAULT_MAX_SCHEMA_TOKENS, estimator: opts.estimator });
+    const earlier = recentLines(history, opts.contextTurns ?? DEFAULT_CONTEXT_TURNS);
+    // Candidates are picked against the earlier turns too: "Saturday" alone matches no tool.
+    const selected = selectTools({ tools: opts.tools, message: [...earlier, query].join("\n"), maxTokens: opts.maxSchemaTokens ?? DEFAULT_MAX_SCHEMA_TOKENS, estimator: opts.estimator });
     if (selected.length === 0) return [];
 
     const result = await opts.model.generate({
-      prompt: `The user said: "${query}"\n\nDecide whether one of the available tools should be called to help answer this, and if so, with what arguments. If none apply, omit toolName.`,
+      prompt: `${earlier.length ? `The conversation so far:\n${earlier.join("\n")}\n\n` : ""}The user said: "${query}"\n\nDecide whether one of the available tools should be called to help answer this, and if so, with what arguments${earlier.length ? " — taking anything the user already said earlier into account" : ""}. If none apply, omit toolName.`,
       responseSchema: decisionSchema(selected.map((t) => t.name)),
     });
     const decision = result.structured as ToolDecision | undefined;

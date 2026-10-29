@@ -24,6 +24,12 @@ npm install @wappy_ai/harness
   default, or swap in a different backend (e.g.
   [`@wappy_ai/connector-cognee`](https://www.npmjs.com/package/@wappy_ai/connector-cognee)) that
   implements the same `Knowledge` interface.
+- **Tools** (`createToolInvoker`) — picks the one tool a message needs and fills its arguments,
+  looking at the last few turns too (`contextTurns`, default 4), so a request spread over messages
+  ("book a visit to X" → "Saturday" → "Ravi") still reaches its tool with everything said. Tools
+  marked `confirmBefore` wait for a Confirm tap.
+- **Standing instructions** (`createAgent({ instructions })`) — who your agent is, how it talks and
+  what it always needs to know, at the start of every reply's prompt.
 - **Router** (`createLlmRouter`) — a lightweight classification step that decides whether a
   message needs a tool call, RAG lookup, or neither, before anything expensive runs.
 

@@ -40,7 +40,7 @@ export interface AgentDeps {
   /** RAG hook — default: no-op (no extra context). Real implementation (§9 Scenario B): `knowledge.ts`'s `createKnowledgeRag()` (M8). */
   retrieveRag?: (input: { contactId: string; query: string }) => Promise<string[]>;
   /** Tool-invocation hook — default: no-op (no findings). Real implementation (§9 Scenario C): `invoke-tools.ts`'s `createToolInvoker()` (M8). */
-  invokeTools?: (input: { message: InboundMessage; decision: RouterDecision }) => Promise<string[]>;
+  invokeTools?: (input: { message: InboundMessage; decision: RouterDecision; history?: Turn[] }) => Promise<string[]>;
   /** Pool available for runtime BM25 selection (T6.5) when a message needsTool — declaring available
    * tools to the model (for the prompt's textual tool-schema disclosure) is separate from actually
    * invoking one (that's `invokeTools`, e.g. `createToolInvoker({tools, ...})` using this same pool). Default []. */
@@ -53,6 +53,10 @@ export interface AgentDeps {
    * this dependency is what RESOLVES one once the user replies. Default: confirm/cancel selection
    * ids are treated as ordinary messages (no interception) when unset. */
   confirmFlow?: ConfirmFlow;
+  /** M19: the app's standing instructions — who the agent is, how it talks, what it always needs
+   * to know — placed at the start of every reply's system prompt, whatever the router picked.
+   * Unset or empty = nothing added (the behaviour before M19). Counts toward the prompt budget. */
+  instructions?: string;
   /** Bounds the whole assembled prompt (T6.1/T6.2); default is a conservative, model-agnostic budget. */
   contextBudget?: ContextBudget;
   /** Turns kept verbatim in the prompt; older history is summarized (T6.3). Default 20. */
