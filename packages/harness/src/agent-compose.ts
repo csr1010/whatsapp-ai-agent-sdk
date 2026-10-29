@@ -4,6 +4,7 @@ import type { InboundMessage, RouterDecision, SessionProfile, SmartMessage, Turn
 import type { AgentDeps } from "./agent.js";
 import { renderSessionProfile, safeCall, trace } from "./agent-support.js";
 import { composeWithBudget } from "./compose-with-budget.js";
+import { cancelSelectionId, confirmSelectionId } from "./confirm.js";
 import { createContextBudget, type ContextBudget } from "./context-budget.js";
 import { windowHistory } from "./history-window.js";
 import { selectTools } from "./tool-selector.js";
@@ -38,6 +39,20 @@ export interface ComposedReply {
   reply: SmartMessage;
   /** M13: session-profile extraction drafted by the same compose call. */
   extracted: { facts?: Record<string, string>; currentState?: string; summary?: string };
+}
+
+/** M19 T19.4: a confirmation requested this turn always reaches the person as Confirm / Cancel
+ * buttons — the compose model is asked to add them, but a safety step can't depend on it remembering. */
+async function withConfirmButtons(reply: SmartMessage, contactId: string, pendingBefore: string | undefined, deps: AgentDeps): Promise<SmartMessage> {
+  if (!deps.confirmFlow) return reply;
+  const pending = await safeCall(() => deps.confirmFlow!.getPending(contactId), undefined);
+  if (!pending || pending.id === pendingBefore) return reply;
+  if (reply.buttons?.some((b) => b.id === confirmSelectionId(pending.id))) return reply;
+  // Buttons replace a list or link button: WhatsApp sends one kind of interactive part per message.
+  const rest: SmartMessage = { ...reply };
+  delete rest.list;
+  delete rest.cta;
+  return { ...rest, text: rest.text ?? pending.summary, buttons: [{ id: confirmSelectionId(pending.id), title: "Confirm" }, { id: cancelSelectionId(pending.id), title: "Cancel" }] };
 }
 
 export async function routeAndCompose(message: InboundMessage, effectiveText: string | undefined, history: Turn[], sessionProfile: SessionProfile | undefined, deps: AgentDeps): Promise<ComposedReply> {
@@ -80,6 +95,9 @@ export async function routeAndCompose(message: InboundMessage, effectiveText: st
     const snippets = await safeCall(() => deps.retrieveRag!({ contactId: message.contactId, query: effectiveText ?? "" }), []);
     recalledSnippets.push(...snippets);
   }
+
+  // Which confirmation was pending before this turn — one requested now is the one the reply must offer.
+  const pendingBefore = deps.confirmFlow ? (await safeCall(() => deps.confirmFlow!.getPending(message.contactId), undefined))?.id : undefined;
 
   const toolSchemas: string[] = [];
   if (confident && decision.needsTool) {
@@ -127,5 +145,6 @@ export async function routeAndCompose(message: InboundMessage, effectiveText: st
   // this compose step is exactly one such call (retries/shrinks happen inside composeWithBudget).
   trace(deps.tracer, "llm", "compose", { usage: composed.usage, dropped: composed.dropped, shrunkForContextLength: composed.shrunkForContextLength, formatRationale: composed.formatRationale });
   // M13: this same compose call drafted the extraction, for free.
-  return { reply: composed.reply, extracted: { facts: composed.sessionFacts, currentState: composed.sessionCurrentState, summary: composed.sessionSummary } };
+  const reply = await withConfirmButtons(composed.reply, message.contactId, pendingBefore, deps);
+  return { reply, extracted: { facts: composed.sessionFacts, currentState: composed.sessionCurrentState, summary: composed.sessionSummary } };
 }

@@ -99,3 +99,56 @@ describe("M19 T19.3: a valid reply survives extras that don't validate", () => {
     expect(sent).toEqual([{ text: "ok" }]);
   });
 });
+
+describe("M19 T19.4: confirm-before-write is guarded by code, not left to the model", () => {
+  const book: Tool = { ...bookVisit, readOnly: false, confirmBefore: true, parameters: { type: "object", properties: { place: { type: "string" }, name: { type: "string" } }, required: ["place", "name"] } };
+
+  test("a required argument still missing → ask for it; nothing is held for confirmation", async () => {
+    const { createClient } = await import("@libsql/client");
+    const { createConfirmFlow } = await import("./confirm.js");
+    const confirmFlow = createConfirmFlow({ client: createClient({ url: ":memory:" }), clock: systemClock });
+    const model: Model = { generate: async () => ({ structured: { toolName: "bookVisit", args: { place: "Golden Terra", name: "" } } }) };
+    const findings = await createToolInvoker({ model, tools: [book], confirmFlow })({ message: msg("m1", "book a visit to Golden Terra"), decision: NEEDS_TOOL });
+    expect(findings[0]).toMatch(/still needs: name/);
+    expect(await confirmFlow.getPending("c1")).toBeUndefined();
+  });
+
+  test("a confirmation requested this turn reaches the person as Confirm/Cancel buttons even if the reply forgot them", async () => {
+    const { createClient } = await import("@libsql/client");
+    const { createConfirmFlow } = await import("./confirm.js");
+    const confirmFlow = createConfirmFlow({ client: createClient({ url: ":memory:" }), clock: systemClock });
+    const model: Model = { generate: async (r) => r.responseSchema && JSON.stringify(r.responseSchema).includes("toolName")
+      ? { structured: { toolName: "bookVisit", args: { place: "Golden Terra", name: "Ravi" } } }
+      : { structured: { message: { text: "Shall I book it?" }, formatRationale: "ask" } } };
+    const sent: { buttons?: { id: string; title: string }[] }[] = [];
+    const agent = createAgent({
+      channel: { name: "test", receive: () => [], send: async (_to, m) => { sent.push(m); return { status: "sent" }; } },
+      memory: fakeMemory(), router: fakeRouter([NEEDS_TOOL]), model, clock: systemClock, tracer: createInMemoryTracer(),
+      tools: [book], confirmFlow, invokeTools: createToolInvoker({ model, tools: [book], confirmFlow }),
+    });
+    await agent.handle(msg("m1", "book a visit to Golden Terra for Ravi"));
+    const pending = await confirmFlow.getPending("c1");
+    expect(sent[0]?.buttons?.map((b) => b.id)).toEqual([`confirm:${pending!.id}`, `cancel:${pending!.id}`]);
+  });
+
+  test("buttons the reply already has are left alone; no new confirmation = reply untouched", async () => {
+    const { createClient } = await import("@libsql/client");
+    const { createConfirmFlow } = await import("./confirm.js");
+    const confirmFlow = createConfirmFlow({ client: createClient({ url: ":memory:" }), clock: systemClock, idGenerator: () => "p1" });
+    const model: Model = { generate: async (r) => r.responseSchema && JSON.stringify(r.responseSchema).includes("toolName")
+      ? { structured: { toolName: "bookVisit", args: { place: "Golden Terra", name: "Ravi" } } }
+      : { structured: { message: { text: "Book it?", buttons: [{ id: "confirm:p1", title: "Yes, book" }, { id: "cancel:p1", title: "No" }] }, formatRationale: "ask" } } };
+    const sent: unknown[] = [];
+    const agent = createAgent({
+      channel: { name: "test", receive: () => [], send: async (_to, m) => { sent.push(m); return { status: "sent" }; } },
+      memory: fakeMemory(), router: fakeRouter([NEEDS_TOOL, { ...NEEDS_TOOL, needsTool: false }]), model, clock: systemClock, tracer: createInMemoryTracer(),
+      tools: [book], confirmFlow, invokeTools: createToolInvoker({ model, tools: [book], confirmFlow }),
+    });
+    await agent.handle(msg("m1", "book a visit to Golden Terra for Ravi"));
+    await agent.handle(msg("m2", "what time is it open?"));
+    expect(sent).toEqual([
+      { text: "Book it?", buttons: [{ id: "confirm:p1", title: "Yes, book" }, { id: "cancel:p1", title: "No" }] },
+      { text: "Book it?", buttons: [{ id: "confirm:p1", title: "Yes, book" }, { id: "cancel:p1", title: "No" }] },
+    ]);
+  });
+});

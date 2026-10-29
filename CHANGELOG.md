@@ -10,6 +10,9 @@
   now also sees each candidate tool's description and parameters, so arguments use the tool's own names.
 - **A valid reply is no longer thrown away** when only the extras around it (session facts, the
   format rationale) don't validate — the reply is sent and the bad extras are dropped.
+- **Confirm-before-write is guarded by code:** a tool isn't run or offered for confirmation while a
+  required argument is missing (the reply asks for it), and a confirmation requested this turn always
+  reaches the person as Confirm / Cancel buttons, even if the model's reply left them out.
 - **`createAgent({ instructions })`**: an app's standing instructions, placed at the start of every
   reply's system prompt. Unset = no change.
 - App settings: `WappyAppDefinition`, `resolveSettings()`, secret fields (`redactSettings()`,

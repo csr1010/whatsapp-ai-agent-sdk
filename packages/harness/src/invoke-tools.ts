@@ -115,6 +115,13 @@ export function createToolInvoker(opts: CreateToolInvokerOptions): (input: { mes
     const tool = selected.find((t) => t.name === decision.toolName);
     if (!tool) return []; // model named a tool outside the candidate set it was actually offered — ignore, don't guess
 
+    // M19 T19.4: a tool isn't run — or offered for confirmation — while a required argument is still
+    // missing; the reply asks for it instead (a booking confirmed without a name helps no one).
+    const args = (decision.args && typeof decision.args === "object" ? decision.args : {}) as Record<string, unknown>;
+    const required = (tool.parameters as { required?: unknown }).required;
+    const missing = Array.isArray(required) ? required.filter((k): k is string => typeof k === "string" && (args[k] === undefined || args[k] === null || String(args[k]).trim() === "")) : [];
+    if (missing.length) return [`${tool.name} still needs: ${missing.join(", ")}. Ask the user for what's missing, one thing at a time — nothing has been done yet.`];
+
     if (tool.confirmBefore) {
       if (!opts.confirmFlow) {
         return [`Tool "${tool.name}" requires confirmation before it can run, but no confirmation flow is configured — tell the user honestly that you can't complete this action right now.`];
