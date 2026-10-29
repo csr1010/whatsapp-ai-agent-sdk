@@ -152,3 +152,36 @@ describe("M19 T19.4: confirm-before-write is guarded by code, not left to the mo
     ]);
   });
 });
+
+describe("M19 T19.5: a reply that breaks a channel limit only in its extras is fitted, not lost", () => {
+  const run = async (message: unknown) => {
+    const sent: unknown[] = [];
+    const model: Model = { generate: async () => ({ structured: { message, formatRationale: "x" } }) };
+    const agent = createAgent({
+      channel: { name: "test", receive: () => [], send: async (_to, m) => { sent.push(m); return { status: "sent" }; } },
+      memory: fakeMemory(), router: fakeRouter([{ ...NEEDS_TOOL, needsTool: false }]), model, clock: systemClock, tracer: createInMemoryTracer(),
+    });
+    await agent.handle(msg("m1", "what do you have?"));
+    return sent[0] as { text?: string; buttons?: unknown[] };
+  };
+
+  test("four buttons → the first three, the text kept", async () => {
+    const b = (n: number) => ({ id: `b${n}`, title: `Option ${n}` });
+    const r = await run({ text: "Here are four.", buttons: [b(1), b(2), b(3), b(4)] });
+    expect(r).toEqual({ text: "Here are four.", buttons: [b(1), b(2), b(3)] });
+  });
+
+  test("an interactive part that can't be fitted → the text alone", async () => {
+    expect(await run({ text: "Our places.", cta: { text: "Open", url: "not a url" } })).toEqual({ text: "Our places." });
+  });
+
+  test("a list over ten rows → the first ten, across sections", async () => {
+    const rows = (n: number, p: string) => Array.from({ length: n }, (_, i) => ({ id: `${p}${i}`, title: `${p} ${i}` }));
+    const r = (await run({ text: "Pick one.", list: { buttonText: "See all", sections: [{ title: "A", rows: rows(7, "a") }, { title: "B", rows: rows(5, "b") }, { title: "C", rows: rows(2, "c") }] } })) as { list?: { sections: { rows: unknown[] }[] } };
+    expect(r.list?.sections.map((x) => x.rows.length)).toEqual([7, 3]);
+  });
+
+  test("nothing usable at all → the honest fallback", async () => {
+    expect((await run({ buttons: "nope" })).text).toMatch(/trouble/);
+  });
+});

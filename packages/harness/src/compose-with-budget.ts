@@ -74,18 +74,36 @@ export interface ComposeWithBudgetResult {
  */
 const str = (v: unknown, max = Infinity): string | undefined => (typeof v === "string" && v.trim() ? v.slice(0, max) : undefined);
 
+/** M19 T19.5: a reply that breaks a channel limit only in its extras is fitted, not thrown away —
+ * the first 3 buttons, the first 10 list rows; failing that, its text alone. A good answer must not
+ * become "trouble putting together a reply" because one button too many came with it. */
+function fitted(m: unknown): SmartMessage | undefined {
+  const ok = (x: unknown) => { const r = SmartMessageSchema.safeParse(x); return r.success ? r.data : undefined; };
+  const direct = ok(m);
+  if (direct || !m || typeof m !== "object") return direct;
+  const x = m as Record<string, unknown>;
+  let left = 10;
+  const list = x.list as { sections?: { rows?: unknown[] }[] } | undefined;
+  const trimmed = {
+    ...x,
+    ...(Array.isArray(x.buttons) ? { buttons: x.buttons.slice(0, 3) } : {}),
+    ...(list?.sections ? { list: { ...list, sections: list.sections.slice(0, 10).map((sec) => { const rows = (sec.rows ?? []).slice(0, Math.max(0, left)); left -= rows.length; return { ...sec, rows }; }).filter((sec) => sec.rows.length) } } : {}),
+  };
+  return ok(trimmed) ?? (typeof x.text === "string" ? ok({ text: x.text }) : undefined);
+}
+
 /** The reply out of a response whose wrapper didn't validate: `message` must be a valid SmartMessage;
  * each extra is kept only if it's usable, and only string-valued facts are kept. */
 function salvage(structured: unknown): Pick<ComposeWithBudgetResult, "reply" | "formatRationale" | "sessionFacts" | "sessionCurrentState" | "sessionSummary"> | undefined {
   if (!structured || typeof structured !== "object") return undefined;
   const s = structured as Record<string, unknown>;
-  const message = SmartMessageSchema.safeParse(s.message);
-  if (!message.success) return undefined;
+  const message = fitted(s.message);
+  if (!message) return undefined;
   const facts = s.sessionFacts && typeof s.sessionFacts === "object" && !Array.isArray(s.sessionFacts)
     ? Object.fromEntries(Object.entries(s.sessionFacts).filter((e): e is [string, string] => typeof e[1] === "string"))
     : undefined;
   return {
-    reply: message.data,
+    reply: message,
     formatRationale: str(s.formatRationale, 300) ?? FALLBACK_RATIONALE,
     ...(facts && Object.keys(facts).length ? { sessionFacts: facts } : {}),
     ...(str(s.sessionCurrentState) ? { sessionCurrentState: str(s.sessionCurrentState) } : {}),
