@@ -104,7 +104,9 @@ export function createToolInvoker(opts: CreateToolInvokerOptions): (input: { mes
     if (selected.length === 0) return [];
 
     const result = await opts.model.generate({
-      prompt: `${earlier.length ? `The conversation so far:\n${earlier.join("\n")}\n\n` : ""}The user said: "${query}"\n\nDecide whether one of the available tools should be called to help answer this, and if so, with what arguments${earlier.length ? " — taking anything the user already said earlier into account" : ""}. If none apply, omit toolName.`,
+      // M19 T19.2: the model is shown what each candidate does and takes — from names alone it can't
+      // tell tools apart, and it invents argument names the tool doesn't read.
+      prompt: `Available tools:\n${selected.map((t) => `- ${t.name}: ${t.description}\n  parameters: ${JSON.stringify(t.parameters)}`).join("\n")}\n\n${earlier.length ? `The conversation so far:\n${earlier.join("\n")}\n\n` : ""}The user said: "${query}"\n\nDecide whether one of the available tools should be called to help answer this, and if so, with what arguments (named exactly as in its parameters)${earlier.length ? " — taking anything the user already said earlier into account" : ""}. If none apply, omit toolName.`,
       responseSchema: decisionSchema(selected.map((t) => t.name)),
     });
     const decision = result.structured as ToolDecision | undefined;

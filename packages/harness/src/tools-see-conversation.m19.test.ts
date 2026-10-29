@@ -23,6 +23,9 @@ describe("M19: the tool choice sees the conversation, not just the latest messag
     expect(findings).toEqual([JSON.stringify({ place: "Golden Terra", day: "Saturday" })]);
     expect(prompts[0]).toContain("user: I'd like to book a visit to Golden Terra");
     expect(prompts[0]).toContain('The user said: "Saturday"');
+    // T19.2: what the tool does and the parameter names it reads are in front of the model
+    expect(prompts[0]).toContain("- bookVisit: book a visit to a place");
+    expect(prompts[0]).toContain('"place"');
   });
 
   test("contextTurns: 0 keeps the latest-message-only behaviour", async () => {
