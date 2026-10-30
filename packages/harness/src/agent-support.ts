@@ -76,13 +76,18 @@ export async function safeCall<T>(fn: () => Promise<T>, fallback: T): Promise<T>
  * empty here; no fallback-to-undefined branch is reachable to simplify away.
  */
 export function summarizeReply(message: SmartMessage): string {
-  if (message.text) return message.text;
   const parts: string[] = [];
-  if (message.buttons) parts.push(`buttons: ${message.buttons.map((b) => b.title).join(", ")}`);
-  if (message.list) parts.push(`list: ${message.list.sections.flatMap((s) => s.rows.map((r) => r.title)).join(", ")}`);
+  // M19 T19.6: the options offered are remembered numbered, with the text — the person's next message
+  // is often "1", "the second one" or a button's title typed out, and it only means something if the
+  // agent can see what it offered. (Before, a reply with text kept only its text.)
+  const n = (titles: string[]) => titles.map((t, i) => `${i + 1}. ${t}`).join(", ");
+  if (message.buttons) parts.push(`buttons: ${n(message.buttons.map((b) => b.title))}`);
+  if (message.list) parts.push(`list: ${n(message.list.sections.flatMap((s) => s.rows.map((r) => r.title)))}`);
   if (message.cta) parts.push(`link "${message.cta.text}": ${message.cta.url}`);
   if (message.media) parts.push(message.media.caption ? `${message.media.kind}: ${message.media.caption}` : message.media.kind);
-  return `[${parts.join("; ")}]`;
+  // A SmartMessage always has text or at least one of these (its schema's own refine).
+  if (!parts.length) return String(message.text);
+  return message.text ? `${message.text}\n[offered — ${parts.join("; ")}]` : `[${parts.join("; ")}]`;
 }
 
 export function trace(tracer: Tracer, system: TracedSystem, event: string, data?: unknown): void {

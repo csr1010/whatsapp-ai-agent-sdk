@@ -10,6 +10,9 @@
   now also sees each candidate tool's description and parameters, so arguments use the tool's own names.
 - **A valid reply is no longer thrown away** when only the extras around it (session facts, the
   format rationale) don't validate — the reply is sent and the bad extras are dropped.
+- **The options a reply offered are remembered:** a reply's buttons and list rows are kept in the
+  conversation history, numbered, alongside its text — so "1", "the second one" or a typed button
+  title on the next turn has something to point at.
 - **A reply over a channel limit is fitted, not lost:** more than 3 buttons or 10 list rows are cut to
   the first ones; an interactive part that can't be fitted is dropped and the text is sent.
 - **Confirm-before-write is guarded by code:** a tool isn't run or offered for confirmation while a

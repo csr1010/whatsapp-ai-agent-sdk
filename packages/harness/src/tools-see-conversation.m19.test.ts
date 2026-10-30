@@ -185,3 +185,22 @@ describe("M19 T19.5: a reply that breaks a channel limit only in its extras is f
     expect((await run({ buttons: "nope" })).text).toMatch(/trouble/);
   });
 });
+
+describe("M19 T19.6: the options a reply offered are remembered, numbered, with its text", () => {
+  test("a reply with text and buttons is remembered with both — so a later \"2\" has something to point at", async () => {
+    const memory = fakeMemory();
+    const model: Model = { generate: async () => ({ structured: { formatRationale: "x", message: { text: "Which one?", buttons: [{ id: "a", title: "Golden City" }, { id: "b", title: "Golden Terra" }] } } }) };
+    const agent = createAgent({ channel: fakeChannel("whatsapp"), memory, router: fakeRouter([{ ...NEEDS_TOOL, needsTool: false }]), model, clock: systemClock, tracer: createInMemoryTracer() });
+    await agent.handle(msg("m1", "show me projects"));
+    const turn = memory.turns.find((t) => t.role === "agent");
+    expect(turn?.text).toBe("Which one?\n[offered — buttons: 1. Golden City, 2. Golden Terra]");
+  });
+
+  test("a plain text reply is remembered as it is", async () => {
+    const memory = fakeMemory();
+    const model: Model = { generate: async () => ({ structured: { formatRationale: "x", message: { text: "Hello." } } }) };
+    const agent = createAgent({ channel: fakeChannel("whatsapp"), memory, router: fakeRouter([{ ...NEEDS_TOOL, needsTool: false }]), model, clock: systemClock, tracer: createInMemoryTracer() });
+    await agent.handle(msg("m1", "hi"));
+    expect(memory.turns.find((t) => t.role === "agent")?.text).toBe("Hello.");
+  });
+});
