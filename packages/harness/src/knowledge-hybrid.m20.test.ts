@@ -63,6 +63,12 @@ for (const mode of [{ name: "stored in rows", opts: {} }, { name: "native vector
   });
 }
 
+test("when the embedder gives no vector for the query, hybrid still answers from keywords", async () => {
+  const k = createKnowledge({ client: memClient(), embed: async (t) => (t[0] === "KA-1123" ? [] : t.map(() => [1, 0, 0])), hybrid: true });
+  await k.ingest("b", "Our licence number is KA-1123");
+  expect((await k.recall("KA-1123"))[0]?.sourceId).toBe("b");
+});
+
 test("hybrid without an embedder is refused — it would quietly be keywords only", () => {
   expect(() => createKnowledge({ client: memClient(), hybrid: true })).toThrow(/embed/);
 });
