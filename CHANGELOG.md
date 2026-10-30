@@ -3,6 +3,9 @@
 ## 0.2.0 (unreleased)
 
 ### @wappy_ai/harness
+- **Hybrid recall.** `createKnowledge({ embed, hybrid: true })` ranks by keywords and vectors and merges
+  the two by position, so one search finds exact codes and names as well as paraphrases and other
+  languages. Without `hybrid`, recall behaves as before.
 - **The tool choice sees the conversation.** `createToolInvoker` now picks and fills a tool using
   the last 4 turns as well as the latest message, so a request spread over messages reaches its
   tool with all its arguments. Set `contextTurns: 0` for the old latest-message-only behaviour.
