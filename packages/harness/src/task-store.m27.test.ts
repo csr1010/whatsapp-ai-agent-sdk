@@ -38,6 +38,14 @@ describe("M27: what someone's in the middle of", () => {
     expect(moveTasks([], { op: "update", state: { a: "b" } }, 2, ttl)).toEqual([]);
   });
 
+  test("a task can be finished by name, wherever it sits", () => {
+    let t = moveTasks([], { op: "start", name: "a" }, 1, ttl);
+    t = moveTasks(t, { op: "start", name: "b" }, 2, ttl);
+    expect(moveTasks(t, { op: "finish", name: "a" }, 3, ttl).map((x) => [x.name, x.status])).toEqual([["b", "active"]]);
+    expect(moveTasks(t, { op: "finish", name: "b" }, 3, ttl).map((x) => [x.name, x.status])).toEqual([["a", "active"]]);
+    expect(moveTasks(t, { op: "finish", name: "nope" }, 3, ttl)).toEqual(t);
+  });
+
   test("the pile can't grow without end", () => {
     let t = moveTasks([], { op: "start", name: "t0" }, 0, ttl);
     for (let i = 1; i < 20; i++) t = moveTasks(t, { op: "start", name: `t${i}` }, i, { ...ttl, most: 5 });

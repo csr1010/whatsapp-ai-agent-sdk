@@ -8,7 +8,7 @@ import { cancelSelectionId, confirmSelectionId } from "./confirm.js";
 import { createContextBudget, type ContextBudget } from "./context-budget.js";
 import { windowHistory } from "./history-window.js";
 import { selectTools } from "./tool-selector.js";
-import { moveTasks } from "./task-store.js";
+import { moveTasks, type MoveOptions } from "./task-store.js";
 import { TOOL_SCHEMAS_BUDGET_FRACTION } from "./assemble.js";
 
 const SCOPE_GUARDRAIL = "If the user's request is genuinely unrelated to what you're configured to help with, say so honestly and directly rather than guessing or making something up.";
@@ -60,6 +60,8 @@ async function withConfirmButtons(reply: SmartMessage, contactId: string, pendin
   return { ...rest, text: rest.text ?? pending.summary, buttons: [{ id: confirmSelectionId(pending.id), title: "Confirm" }, { id: cancelSelectionId(pending.id), title: "Cancel" }] };
 }
 
+export const taskMoveOptions = (deps: AgentDeps): MoveOptions => ({ ...(deps.taskTtlMs !== undefined ? { ttlMs: deps.taskTtlMs } : {}), ...(deps.mostTasks !== undefined ? { most: deps.mostTasks } : {}) });
+
 export async function routeAndCompose(message: InboundMessage, effectiveText: string | undefined, history: Turn[], sessionProfile: SessionProfile | undefined, deps: AgentDeps, tasksBefore?: Task[], promised?: Commitment[]): Promise<ComposedReply> {
   trace(deps.tracer, "router", "route");
   let decision: RouterDecision;
@@ -88,7 +90,7 @@ export async function routeAndCompose(message: InboundMessage, effectiveText: st
   }
   const allowedTools = viewFailed ? (deps.tools ?? []).filter((t) => t.readOnly).map((t) => t.name) : view?.tools;
   const reachable = (name: string) => !allowedTools || allowedTools.includes(name);
-  const taskOptions = deps.taskTtlMs !== undefined ? { ttlMs: deps.taskTtlMs } : {};
+  const taskOptions = taskMoveOptions(deps);
   let tasks = tasksBefore && view?.move ? moveTasks(tasksBefore, view.move, deps.clock.now(), taskOptions) : tasksBefore;
 
   const confident = decision.confidence >= (deps.confidenceThreshold ?? 0.3);

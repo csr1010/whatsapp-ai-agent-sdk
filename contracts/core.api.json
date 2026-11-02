@@ -413,11 +413,11 @@
   },
   "TaskMove": {
     "kind": "TypeAliasDeclaration",
-    "type": "{    op: \"start\";    name: string;    mode?: string | undefined;    state?: Record<string, string> | undefined;} | {    op: \"update\";    state: Record<string, string>;} | {    op: \"resume\";    name: string;} | {    op: \"finish\";}"
+    "type": "{    op: \"start\";    name: string;    mode?: string | undefined;    state?: Record<string, string> | undefined;} | {    op: \"update\";    state: Record<string, string>;} | {    op: \"resume\";    name: string;} | {    op: \"finish\";    name?: string | undefined;}"
   },
   "TaskMoveSchema": {
     "kind": "VariableDeclaration",
-    "type": "z.ZodDiscriminatedUnion<[z.ZodObject<{    op: z.ZodLiteral<\"start\">;    name: z.ZodString;    mode: z.ZodOptional<z.ZodString>;    state: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodString>>;}, z.core.$strip>, z.ZodObject<{    op: z.ZodLiteral<\"update\">;    state: z.ZodRecord<z.ZodString, z.ZodString>;}, z.core.$strip>, z.ZodObject<{    op: z.ZodLiteral<\"resume\">;    name: z.ZodString;}, z.core.$strip>, z.ZodObject<{    op: z.ZodLiteral<\"finish\">;}, z.core.$strip>], \"op\">"
+    "type": "z.ZodDiscriminatedUnion<[z.ZodObject<{    op: z.ZodLiteral<\"start\">;    name: z.ZodString;    mode: z.ZodOptional<z.ZodString>;    state: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodString>>;}, z.core.$strip>, z.ZodObject<{    op: z.ZodLiteral<\"update\">;    state: z.ZodRecord<z.ZodString, z.ZodString>;}, z.core.$strip>, z.ZodObject<{    op: z.ZodLiteral<\"resume\">;    name: z.ZodString;}, z.core.$strip>, z.ZodObject<{    op: z.ZodLiteral<\"finish\">;    name: z.ZodOptional<z.ZodString>;}, z.core.$strip>], \"op\">"
   },
   "TaskSchema": {
     "kind": "VariableDeclaration",

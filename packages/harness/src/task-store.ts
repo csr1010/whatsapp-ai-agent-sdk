@@ -45,8 +45,12 @@ export function moveTasks(tasks: Task[], move: TaskMove, now: number, o: MoveOpt
     case "resume":
       return toFront(move.name) ?? tasks;
     case "finish": {
-      const [, next, ...rest] = tasks;
-      return next ? [touched(next), ...rest] : [];
+      const done = move.name ? tasks.find((t) => t.name === move.name) : tasks[0];
+      if (!done) return tasks;
+      const rest = tasks.filter((t) => t !== done);
+      if (done !== tasks[0]) return rest;
+      const [next, ...others] = rest;
+      return next ? [touched(next), ...others] : [];
     }
   }
 }

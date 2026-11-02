@@ -5,7 +5,8 @@ import type { SkillRegistry } from "./skills.js";
 import { parseConfirmSelection, type ConfirmFlow } from "./confirm.js";
 import { liveFacts, safeAppend, safeCall, safeLoad, safeLoadSessionProfile, safeSetSessionProfile, summarizeReply, trace } from "./agent-support.js";
 import { resolvePendingConfirmation } from "./agent-confirm.js";
-import { routeAndCompose, type ComposedReply } from "./agent-compose.js";
+import { routeAndCompose, taskMoveOptions, type ComposedReply } from "./agent-compose.js";
+import { moveTasks } from "./task-store.js";
 
 // The agent's prompt rules live with the compose path; re-exported here, where callers always found them.
 export { FORMAT_REASONING, GROUNDING_HONESTY } from "./agent-compose.js";
@@ -100,6 +101,11 @@ export interface AgentDeps {
   taskStore?: TaskStore;
   /** How long an untouched task lasts. Default 7 days. */
   taskTtlMs?: number;
+  /** How many tasks one contact can hold. Default 5. */
+  mostTasks?: number;
+  /** Task moves known only once the message has run, whichever path it took (a confirm tap doesn't
+   * compose). Applied inside this contact's turn, so a following message can't undo them. */
+  movesAfter?: (contactId: string) => TaskMove[];
   /** M27: what the business has promised each contact. Unset = nothing is read or logged. */
   commitmentStore?: CommitmentStore;
   /** M27: what this message's reply should see and may do. Runs after routing. Unset = the agent's
@@ -219,7 +225,8 @@ async function handleOne(message: InboundMessage, deps: AgentDeps): Promise<Deli
   // there's nothing to extract) — merged over the existing profile, not replacing it, when written below.
   let extracted: ComposedReply["extracted"] = {};
   // M27: both undefined when their store isn't set, which is what keeps this path unchanged then.
-  const tasksBefore = deps.taskStore ? await safeCall(() => deps.taskStore!.list(message.contactId, deps.clock.now()), []) : undefined;
+  // A store that can't be read isn't an empty one: saving over it would erase paused tasks.
+  const tasksBefore = deps.taskStore ? await safeCall<Task[] | undefined>(() => deps.taskStore!.list(message.contactId, deps.clock.now()), undefined) : undefined;
   const promised = deps.commitmentStore ? await safeCall(() => deps.commitmentStore!.list(message.contactId), []) : undefined;
   let tasksAfter = tasksBefore;
   let commitments: ComposedReply["commitments"];
@@ -236,6 +243,8 @@ async function handleOne(message: InboundMessage, deps: AgentDeps): Promise<Deli
   } else {
     ({ reply, extracted, tasks: tasksAfter, commitments } = await routeAndCompose(message, effectiveText, history, sessionProfile, deps, tasksBefore, promised));
   }
+
+  if (tasksAfter) for (const move of deps.movesAfter?.(message.contactId) ?? []) tasksAfter = moveTasks(tasksAfter, move, deps.clock.now(), taskMoveOptions(deps));
 
   const channelSystem = KNOWN_TRACED_CHANNELS.has(deps.channel.name) ? (deps.channel.name as TracedSystem) : undefined;
   if (channelSystem) trace(deps.tracer, channelSystem, "send");
@@ -277,7 +286,8 @@ async function handleOne(message: InboundMessage, deps: AgentDeps): Promise<Deli
         ...(nextCurrentState !== undefined ? { currentState: nextCurrentState } : {}),
         ...(nextSummary !== undefined ? { summary: nextSummary } : {}),
         expiresAt: now + (deps.sessionProfileTtlMs ?? DEFAULT_SESSION_PROFILE_TTL_MS),
-        ...(deps.factLifetimeMs ? { factsAt: { ...sessionProfile?.factsAt, ...Object.fromEntries(Object.keys(extracted.facts ?? {}).map((k) => [k, now])) } } : {}),
+        // Stamped when it's learned or changes: repeating a fact doesn't make it younger.
+        ...(deps.factLifetimeMs ? { factsAt: { ...sessionProfile?.factsAt, ...Object.fromEntries(Object.entries(extracted.facts ?? {}).filter(([k, v]) => sessionProfile?.facts[k] !== v).map(([k]) => [k, now])) } } : {}),
       });
     }
   }

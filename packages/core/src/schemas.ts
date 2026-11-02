@@ -184,7 +184,7 @@ export const TaskMoveSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("start"), name: z.string().min(1), mode: z.string().optional(), state: z.record(z.string(), z.string()).optional() }),
   z.object({ op: z.literal("update"), state: z.record(z.string(), z.string()) }),
   z.object({ op: z.literal("resume"), name: z.string().min(1) }),
-  z.object({ op: z.literal("finish") }),
+  z.object({ op: z.literal("finish"), name: z.string().min(1).optional() }),
 ]);
 export type TaskMove = z.infer<typeof TaskMoveSchema>;
 

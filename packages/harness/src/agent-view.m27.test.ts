@@ -141,6 +141,47 @@ describe("M27: tasks and promises", () => {
   });
 });
 
+describe("M27: what the review of the first version found", () => {
+  const held = (name: string, status: Task["status"] = "active"): Task => ({ id: name, name, state: {}, status, startedAt: 0, updatedAt: 0, expiresAt: 9e9 });
+
+  test("a store that can't be read isn't taken to be empty, so its tasks aren't overwritten", async () => {
+    let saved = 0;
+    const flaky: TaskStore = { list: async () => { throw new Error("down"); }, save: async () => { saved++; } };
+    await agent({ taskStore: flaky, viewFor: () => ({ move: { op: "start", name: "order" } }) }).run.handle(msg());
+    expect(saved).toBe(0);
+  });
+
+  test("what ended during the message is settled inside it, whichever path it took", async () => {
+    const store = tasks();
+    await store.save("c1", [held("order"), held("other", "paused")]);
+    store.saved.length = 0;
+    await agent({ taskStore: store, movesAfter: () => [{ op: "finish", name: "order" }] }).run.handle(msg());
+    expect(store.saved[0]!.map((t) => [t.name, t.status])).toEqual([["other", "active"]]);
+  });
+
+  test("a host can hold one task at a time", async () => {
+    const store = tasks();
+    await store.save("c1", [held("order")]);
+    await agent({ taskStore: store, mostTasks: 1, viewFor: () => ({ move: { op: "start", name: "other" } }) }).run.handle(msg());
+    expect(store.saved.at(-1)!.map((t) => t.name)).toEqual(["other"]);
+  });
+
+  test("a fact hidden by name is hidden however the model worded it", async () => {
+    const profiles: SessionProfileStore = { get: async () => ({ contactId: "c1", facts: { Budget_Range: "low", name: "Jane" }, expiresAt: 9e9 }), set: async () => {} };
+    const a = agent({ sessionProfileStore: profiles, viewFor: () => ({ hideMemory: ["budget"] }) });
+    await a.run.handle(msg());
+    expect(`${a.seen[0]!.system}${a.seen[0]!.prompt}`).not.toContain("low");
+  });
+
+  test("saying a fact again doesn't make it younger; changing it does", async () => {
+    let last: SessionProfile = { contactId: "c1", facts: { size: "L", day: "Sat" }, factsAt: { size: 1, day: 1 }, expiresAt: 9e9 };
+    const s: SessionProfileStore = { get: async () => last, set: async (p) => { last = p; } };
+    const model: Model = { generate: async () => ({ structured: { formatRationale: "r", sessionFacts: { size: "L", day: "Sun" }, message: { text: "hi" } } }) };
+    await createAgent({ channel: fakeChannel("whatsapp"), memory: fakeMemory(), router: fakeRouter([said]), model, clock: clock(), tracer: createInMemoryTracer(), sessionProfileStore: s, factLifetimeMs: () => 1e9 }).handle(msg());
+    expect(last.factsAt).toEqual({ size: 1, day: 1000 });
+  });
+});
+
 describe("M27: each fact has its own lifetime", () => {
   const stored = (): SessionProfileStore & { last?: SessionProfile } => {
     const s: SessionProfileStore & { last?: SessionProfile } = { get: async () => s.last, set: async (p) => { s.last = p; } };
