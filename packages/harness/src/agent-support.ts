@@ -44,10 +44,10 @@ export async function safeSetSessionProfile(store: SessionProfileStore, profile:
  * this is the one caller that actually has a `SessionProfile` to render. `undefined` when there's
  * nothing worth including (no facts, no currentState, no summary) — an all-empty profile renders
  * to nothing rather than an empty placeholder section. */
-export function renderSessionProfile(profile: SessionProfile | undefined, onlyFacts?: string[]): string | undefined {
+export function renderSessionProfile(profile: SessionProfile | undefined, hiddenFacts: string[] = []): string | undefined {
   if (!profile) return undefined;
   const lines: string[] = [];
-  const factEntries = Object.entries(profile.facts).filter(([k]) => !onlyFacts || onlyFacts.includes(k));
+  const factEntries = Object.entries(profile.facts).filter(([k]) => !hiddenFacts.includes(k));
   if (factEntries.length > 0) lines.push(`Known facts about this contact: ${factEntries.map(([k, v]) => `${k}: ${v}`).join("; ")}`);
   if (profile.currentState) lines.push(`Current state of this thread: ${profile.currentState}`);
   if (profile.summary) lines.push(`Session summary so far: ${profile.summary}`);

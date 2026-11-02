@@ -39,8 +39,9 @@ export interface TurnView {
   notes?: string[];
   /** The only tools this reply can reach, by selection, schema and invocation. */
   tools?: string[];
-  /** The only remembered facts this reply can read. */
-  memory?: string[];
+  /** Remembered facts this reply can't read. Hidden by name rather than allowed by name: the model
+   * names facts as it learns them, so a host can't list them all, only the ones it restricts. */
+  hideMemory?: string[];
   /** What this message does to the contact's tasks. */
   move?: TaskMove;
 }

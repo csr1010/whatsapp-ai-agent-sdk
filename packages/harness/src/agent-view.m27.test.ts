@@ -62,9 +62,18 @@ describe("M27: the view for this message", () => {
     expect(allowed).toEqual(["find"]);
   });
 
+  test("the router can see what the contact is in the middle of", async () => {
+    const store = tasks(), held: Task = { id: "t", name: "order", state: {}, status: "active", startedAt: 0, updatedAt: 0, expiresAt: 9e9 };
+    await store.save("c1", [held]);
+    let seen: Task[] | undefined;
+    const a = agent({ taskStore: store, router: { route: async (i) => { seen = i.tasks; return said; } } });
+    await a.run.handle(msg());
+    expect(seen).toEqual([held]);
+  });
+
   test("the view can hide what this job shouldn't read", async () => {
     const profiles: SessionProfileStore = { get: async () => ({ contactId: "c1", facts: { name: "Jane", budget: "low" }, expiresAt: 9e9 }), set: async () => {} };
-    const a = agent({ sessionProfileStore: profiles, viewFor: () => ({ memory: ["name"] }) });
+    const a = agent({ sessionProfileStore: profiles, viewFor: () => ({ hideMemory: ["budget"] }) });
     await a.run.handle(msg());
     const text = `${a.seen[0]!.system}${a.seen[0]!.prompt}`;
     expect(text).toContain("Jane");

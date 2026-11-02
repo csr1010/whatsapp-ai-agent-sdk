@@ -70,7 +70,7 @@ export async function routeAndCompose(message: InboundMessage, effectiveText: st
     // "Available tools: (none)" even when tools existed — found by hand-testing a real
     // conversation: "show me your products" was declined because the router, told there were no
     // tools at all, never set needsTool even though searchProducts was fully wired.
-    decision = await deps.router.route({ message: { ...message, text: effectiveText }, history, availableSkills: deps.skills?.names() ?? [], availableTools: deps.tools?.map((t) => t.name) ?? [] });
+    decision = await deps.router.route({ message: { ...message, text: effectiveText }, history, availableSkills: deps.skills?.names() ?? [], availableTools: deps.tools?.map((t) => t.name) ?? [], ...(tasksBefore ? { tasks: tasksBefore } : {}) });
   } catch {
     decision = { intent: "general", needsRAG: false, needsTool: false, escalate: false, confidence: 0 };
   }
@@ -152,7 +152,7 @@ export async function routeAndCompose(message: InboundMessage, effectiveText: st
     model: deps.model,
     input: {
       system: [(view?.instructions ?? deps.instructions)?.trim(), SCOPE_GUARDRAIL, FORMAT_REASONING, GROUNDING_HONESTY].filter(Boolean).join("\n\n"),
-      sessionProfile: renderSessionProfile(sessionProfile, view?.memory),
+      sessionProfile: renderSessionProfile(sessionProfile, view?.hideMemory),
       skillFragments,
       toolSchemas,
       summary: windowed.summary,
