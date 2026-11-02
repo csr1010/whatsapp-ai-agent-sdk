@@ -128,7 +128,7 @@ export function createToolInvoker(opts: CreateToolInvokerOptions): (input: { mes
       }
       const argsJson = JSON.stringify(decision.args ?? {});
       const boundedArgsJson = argsJson.length > MAX_SUMMARY_ARGS_CHARS ? `${argsJson.slice(0, MAX_SUMMARY_ARGS_CHARS)}…` : argsJson;
-      const summary = `${tool.name} with arguments ${boundedArgsJson}`;
+      const summary = tool.describe?.(args).doing ?? `${tool.name} with arguments ${boundedArgsJson}`;
       const pending = await opts.confirmFlow.request({ contactId: message.contactId, toolName: tool.name, args: decision.args ?? {}, summary });
       // The button ids embed THIS SPECIFIC pending confirmation's id (confirmSelectionId/
       // cancelSelectionId) rather than bare "confirm"/"cancel" — a later, different confirmation

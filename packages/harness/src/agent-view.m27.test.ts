@@ -182,6 +182,31 @@ describe("M27: what the review of the first version found", () => {
   });
 });
 
+describe("M27: what a person is told about an action", () => {
+  const said = { intent: "x", needsRAG: false, needsTool: true, escalate: false, confidence: 0.9 };
+  const held = { id: "p1", contactId: "c1", toolName: "send", args: { a: 1 }, summary: "send with arguments {}", createdAt: 0, expiresAt: 9e9 };
+  const flow = () => ({ request: async () => held, getPending: async () => held, resolve: async () => held }) as never;
+  const tap = (selectionId: string) => ({ ...msg(), selectionId });
+  const sends = (describe?: Tool["describe"]) => [{ ...tool("send", false), ...(describe ? { describe } : {}) }];
+
+  test("a tool can say it in words, whatever happens", async () => {
+    const words = () => ({ doing: "your request", done: "That's gone to the team.", cancelled: "Fine, nothing was sent." });
+    const channel = fakeChannel("whatsapp");
+    await agent({ channel, confirmFlow: flow(), tools: sends(words) }, said).run.handle(tap("confirm:p1"));
+    expect(JSON.stringify(channel)).toContain("That's gone to the team.");
+    const other = fakeChannel("whatsapp");
+    await agent({ channel: other, confirmFlow: flow(), tools: sends(words) }, said).run.handle(tap("cancel:p1"));
+    expect(JSON.stringify(other)).toContain("Fine, nothing was sent.");
+  });
+
+  test("the words a person is asked to confirm come from the tool", async () => {
+    let summary = "";
+    const invoke = createToolInvoker({ tools: [{ ...tool("send", false), confirmBefore: true, describe: () => ({ doing: "your request", done: "", cancelled: "" }) }], confirmFlow: { request: async (r: { summary: string }) => { summary = r.summary; return held; } } as never, model: { generate: async () => ({ structured: { toolName: "send", args: {} } }) } });
+    await invoke({ message: { ...msg(), text: "send" }, decision: said });
+    expect(summary).toBe("your request");
+  });
+});
+
 describe("M27: each fact has its own lifetime", () => {
   const stored = (): SessionProfileStore & { last?: SessionProfile } => {
     const s: SessionProfileStore & { last?: SessionProfile } = { get: async () => s.last, set: async (p) => { s.last = p; } };

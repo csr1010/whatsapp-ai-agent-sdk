@@ -35,17 +35,18 @@ export async function resolvePendingConfirmation(message: InboundMessage, parsed
     return undefined;
   }, undefined);
 
+  const tool = deps.tools?.find((t) => t.name === pending.toolName);
+  const words = tool?.describe?.(pending.args);
   if (parsed.action === CANCEL_ACTION) {
     trace(deps.tracer, "tools", "invoke", { toolName: pending.toolName, confirmOutcome: "canceled" });
-    return { text: `Okay, I've canceled that — ${pending.summary} was not carried out.` };
+    return { text: words?.cancelled ?? `Okay, I've canceled that — ${pending.summary} was not carried out.` };
   }
 
   trace(deps.tracer, "tools", "invoke", { toolName: pending.toolName, confirmOutcome: "confirmed" });
-  const tool = deps.tools?.find((t) => t.name === pending.toolName);
   if (!tool) return { text: CONFIRM_TOOL_UNAVAILABLE_TEXT };
 
   const toolResult = await safeCall(() => tool.execute(pending.args), { toolName: pending.toolName, ok: false, error: "internal error invoking tool" });
-  if (toolResult.ok) return { text: `Done — ${pending.summary} completed.` };
+  if (toolResult.ok) return { text: words?.done ?? `Done — ${pending.summary} completed.` };
 
   await safeCall(async () => {
     await deps.onEscalate?.(message, { intent: "confirm", needsRAG: false, needsTool: true, escalate: true, confidence: 1 });

@@ -12,6 +12,8 @@ export interface Tool {
   readOnly: boolean;
   /** Requires explicit user/operator confirmation before executing, regardless of readOnly. */
   confirmBefore: boolean;
+  /** M27: what a person is told about this action, in words. Unset = the tool's name and arguments. */
+  describe?(args: unknown): { doing: string; done: string; cancelled: string };
   execute(args: unknown): Promise<ToolResult>;
 }
 
