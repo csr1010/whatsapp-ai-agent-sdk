@@ -1,4 +1,4 @@
-import type { DeliveryResult, InboundMessage, RouterDecision, SessionProfile, SmartMessage, ToolResult, Turn } from "./schemas.js";
+import type { Commitment, DeliveryResult, InboundMessage, RouterDecision, SessionProfile, SmartMessage, Task, ToolResult, Turn } from "./schemas.js";
 
 /** JSON Schema object, as produced by zod's toJSONSchema and consumed by Model tool-calling. */
 export type JsonSchema = Record<string, unknown>;
@@ -28,6 +28,8 @@ export interface Skill {
   promptFragment: string;
   /** Names of tools (from registered ToolProviders) this skill may use. */
   tools?: string[];
+  /** M27: the job this skill belongs to, for a host that groups skills. Core never interprets it. */
+  mode?: string;
   /** Opaque, skill-owned shape persisted alongside Memory; core never interprets it. */
   memorySchema?: unknown;
   /**
@@ -93,11 +95,26 @@ export interface SessionProfileStore {
   set(profile: SessionProfile): Promise<void>;
 }
 
+/** M27: one focused store, newest task first. One writer per contact, so a whole-list save is safe. */
+export interface TaskStore {
+  /** Expired tasks are absent, same contract as `SessionProfileStore.get`. */
+  list(contactId: string, now: number): Promise<Task[]>;
+  save(contactId: string, tasks: Task[]): Promise<void>;
+}
+
+/** M27: append-only. Logging the same id twice keeps the first, so a retried message can't double up. */
+export interface CommitmentStore {
+  log(commitment: Commitment): Promise<void>;
+  list(contactId: string): Promise<Commitment[]>;
+}
+
 export interface RouterInput {
   message: InboundMessage;
   history: Turn[];
   availableSkills: string[];
   availableTools: string[];
+  /** M27: what this contact is in the middle of, when a `TaskStore` is set. */
+  tasks?: Task[];
 }
 
 export interface Router {

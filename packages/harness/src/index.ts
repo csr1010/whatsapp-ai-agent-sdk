@@ -1,6 +1,8 @@
 export const packageName = "@wappy_ai/harness";
 export * from "./memory.js";
 export * from "./session-profile.js";
+export * from "./task-store.js";
+export * from "./commitments.js";
 export * from "./agent.js";
 export * from "./bound-inbound-text.js";
 export * from "./bound-tool-result.js";

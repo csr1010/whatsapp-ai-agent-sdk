@@ -43,6 +43,18 @@
     "kind": "InterfaceDeclaration",
     "type": "Clock"
   },
+  "Commitment": {
+    "kind": "TypeAliasDeclaration",
+    "type": "{    id: string;    contactId: string;    kind: string;    text: string;    at: number;}"
+  },
+  "CommitmentSchema": {
+    "kind": "VariableDeclaration",
+    "type": "z.ZodObject<{    id: z.ZodString;    contactId: z.ZodString;    kind: z.ZodString;    text: z.ZodString;    at: z.ZodNumber;}, z.core.$strip>"
+  },
+  "CommitmentStore": {
+    "kind": "InterfaceDeclaration",
+    "type": "CommitmentStore"
+  },
   "CORE_VERSION": {
     "kind": "VariableDeclaration",
     "type": "\"0.1.0\""
@@ -265,11 +277,11 @@
   },
   "SessionProfile": {
     "kind": "TypeAliasDeclaration",
-    "type": "{    contactId: string;    facts: Record<string, string>;    expiresAt: number;    currentState?: string | undefined;    summary?: string | undefined;}"
+    "type": "{    contactId: string;    facts: Record<string, string>;    expiresAt: number;    currentState?: string | undefined;    summary?: string | undefined;    factsAt?: Record<string, number> | undefined;}"
   },
   "SessionProfileSchema": {
     "kind": "VariableDeclaration",
-    "type": "z.ZodObject<{    contactId: z.ZodString;    facts: z.ZodRecord<z.ZodString, z.ZodString>;    currentState: z.ZodOptional<z.ZodString>;    summary: z.ZodOptional<z.ZodString>;    expiresAt: z.ZodNumber;}, z.core.$strip>"
+    "type": "z.ZodObject<{    contactId: z.ZodString;    facts: z.ZodRecord<z.ZodString, z.ZodString>;    currentState: z.ZodOptional<z.ZodString>;    summary: z.ZodOptional<z.ZodString>;    expiresAt: z.ZodNumber;    factsAt: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodNumber>>;}, z.core.$strip>"
   },
   "SessionProfileStore": {
     "kind": "InterfaceDeclaration",
@@ -394,6 +406,26 @@
   "systemClock": {
     "kind": "VariableDeclaration",
     "type": "Clock"
+  },
+  "Task": {
+    "kind": "TypeAliasDeclaration",
+    "type": "{    id: string;    name: string;    state: Record<string, string>;    status: \"active\" | \"paused\";    startedAt: number;    updatedAt: number;    expiresAt: number;    mode?: string | undefined;}"
+  },
+  "TaskMove": {
+    "kind": "TypeAliasDeclaration",
+    "type": "{    op: \"start\";    name: string;    mode?: string | undefined;    state?: Record<string, string> | undefined;} | {    op: \"update\";    state: Record<string, string>;} | {    op: \"resume\";    name: string;} | {    op: \"finish\";}"
+  },
+  "TaskMoveSchema": {
+    "kind": "VariableDeclaration",
+    "type": "z.ZodDiscriminatedUnion<[z.ZodObject<{    op: z.ZodLiteral<\"start\">;    name: z.ZodString;    mode: z.ZodOptional<z.ZodString>;    state: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodString>>;}, z.core.$strip>, z.ZodObject<{    op: z.ZodLiteral<\"update\">;    state: z.ZodRecord<z.ZodString, z.ZodString>;}, z.core.$strip>, z.ZodObject<{    op: z.ZodLiteral<\"resume\">;    name: z.ZodString;}, z.core.$strip>, z.ZodObject<{    op: z.ZodLiteral<\"finish\">;}, z.core.$strip>], \"op\">"
+  },
+  "TaskSchema": {
+    "kind": "VariableDeclaration",
+    "type": "z.ZodObject<{    id: z.ZodString;    name: z.ZodString;    mode: z.ZodOptional<z.ZodString>;    state: z.ZodRecord<z.ZodString, z.ZodString>;    status: z.ZodEnum<{        active: \"active\";        paused: \"paused\";    }>;    startedAt: z.ZodNumber;    updatedAt: z.ZodNumber;    expiresAt: z.ZodNumber;}, z.core.$strip>"
+  },
+  "TaskStore": {
+    "kind": "InterfaceDeclaration",
+    "type": "TaskStore"
   },
   "Tool": {
     "kind": "InterfaceDeclaration",

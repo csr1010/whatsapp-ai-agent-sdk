@@ -93,14 +93,14 @@ function recentLines(history: Turn[] | undefined, n: number): string[] {
     .map((t) => `${t.role}: ${t.text!.slice(0, MAX_CONTEXT_TURN_CHARS)}`);
 }
 
-export function createToolInvoker(opts: CreateToolInvokerOptions): (input: { message: InboundMessage; decision: RouterDecision; history?: Turn[] }) => Promise<string[]> {
+export function createToolInvoker(opts: CreateToolInvokerOptions): (input: { message: InboundMessage; decision: RouterDecision; history?: Turn[]; allowedTools?: string[] }) => Promise<string[]> {
   const boundOptions = opts.boundOptions ?? DEFAULT_BOUND_OPTIONS;
 
-  return async ({ message, history }) => {
+  return async ({ message, history, allowedTools }) => {
     const query = message.text ?? "";
     const earlier = recentLines(history, opts.contextTurns ?? DEFAULT_CONTEXT_TURNS);
     // Candidates are picked against the earlier turns too: "Saturday" alone matches no tool.
-    const selected = selectTools({ tools: opts.tools, message: [...earlier, query].join("\n"), maxTokens: opts.maxSchemaTokens ?? DEFAULT_MAX_SCHEMA_TOKENS, estimator: opts.estimator });
+    const selected = selectTools({ tools: allowedTools ? opts.tools.filter((t) => allowedTools.includes(t.name)) : opts.tools, message: [...earlier, query].join("\n"), maxTokens: opts.maxSchemaTokens ?? DEFAULT_MAX_SCHEMA_TOKENS, estimator: opts.estimator });
     if (selected.length === 0) return [];
 
     const result = await opts.model.generate({

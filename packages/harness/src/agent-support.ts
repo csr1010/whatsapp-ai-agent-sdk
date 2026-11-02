@@ -44,10 +44,10 @@ export async function safeSetSessionProfile(store: SessionProfileStore, profile:
  * this is the one caller that actually has a `SessionProfile` to render. `undefined` when there's
  * nothing worth including (no facts, no currentState, no summary) — an all-empty profile renders
  * to nothing rather than an empty placeholder section. */
-export function renderSessionProfile(profile: SessionProfile | undefined): string | undefined {
+export function renderSessionProfile(profile: SessionProfile | undefined, onlyFacts?: string[]): string | undefined {
   if (!profile) return undefined;
   const lines: string[] = [];
-  const factEntries = Object.entries(profile.facts);
+  const factEntries = Object.entries(profile.facts).filter(([k]) => !onlyFacts || onlyFacts.includes(k));
   if (factEntries.length > 0) lines.push(`Known facts about this contact: ${factEntries.map(([k, v]) => `${k}: ${v}`).join("; ")}`);
   if (profile.currentState) lines.push(`Current state of this thread: ${profile.currentState}`);
   if (profile.summary) lines.push(`Session summary so far: ${profile.summary}`);
@@ -96,4 +96,11 @@ export function trace(tracer: Tracer, system: TracedSystem, event: string, data?
   } catch {
     // observability must never cost the user their reply
   }
+}
+
+/** M27: the profile without facts past their own lifetime. A fact with no stamp or no lifetime stays. */
+export function liveFacts(profile: SessionProfile | undefined, now: number, lifetimeMs: ((fact: string) => number | undefined) | undefined): SessionProfile | undefined {
+  if (!profile || !lifetimeMs) return profile;
+  const alive = ([k]: [string, unknown]) => { const at = profile.factsAt?.[k], life = lifetimeMs(k); return at === undefined || life === undefined || now <= at + life; };
+  return { ...profile, facts: Object.fromEntries(Object.entries(profile.facts).filter(alive)) };
 }

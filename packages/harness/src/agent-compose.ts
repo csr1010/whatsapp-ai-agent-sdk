@@ -1,13 +1,14 @@
 // The model path: route -> (skill / RAG / tools / escalate) -> windowed history -> compose within
 // budget. Only reached when no direct answer applies (refusal, confirm/cancel, Skill.respond).
-import type { InboundMessage, RouterDecision, SessionProfile, SmartMessage, Turn } from "@wappy_ai/core";
-import type { AgentDeps } from "./agent.js";
+import type { Commitment, InboundMessage, RouterDecision, SessionProfile, SmartMessage, Task, Turn } from "@wappy_ai/core";
+import type { AgentDeps, ReplyReview, TurnView } from "./agent.js";
 import { renderSessionProfile, safeCall, trace } from "./agent-support.js";
 import { composeWithBudget } from "./compose-with-budget.js";
 import { cancelSelectionId, confirmSelectionId } from "./confirm.js";
 import { createContextBudget, type ContextBudget } from "./context-budget.js";
 import { windowHistory } from "./history-window.js";
 import { selectTools } from "./tool-selector.js";
+import { moveTasks } from "./task-store.js";
 import { TOOL_SCHEMAS_BUDGET_FRACTION } from "./assemble.js";
 
 const SCOPE_GUARDRAIL = "If the user's request is genuinely unrelated to what you're configured to help with, say so honestly and directly rather than guessing or making something up.";
@@ -39,6 +40,10 @@ export interface ComposedReply {
   reply: SmartMessage;
   /** M13: session-profile extraction drafted by the same compose call. */
   extracted: { facts?: Record<string, string>; currentState?: string; summary?: string };
+  /** M27: the contact's tasks after this message. Same array as went in when nothing moved. */
+  tasks?: Task[];
+  /** M27: promises this reply makes, logged once it has been sent. */
+  commitments?: { kind: string; text: string }[];
 }
 
 /** M19 T19.4: a confirmation requested this turn always reaches the person as Confirm / Cancel
@@ -55,7 +60,7 @@ async function withConfirmButtons(reply: SmartMessage, contactId: string, pendin
   return { ...rest, text: rest.text ?? pending.summary, buttons: [{ id: confirmSelectionId(pending.id), title: "Confirm" }, { id: cancelSelectionId(pending.id), title: "Cancel" }] };
 }
 
-export async function routeAndCompose(message: InboundMessage, effectiveText: string | undefined, history: Turn[], sessionProfile: SessionProfile | undefined, deps: AgentDeps): Promise<ComposedReply> {
+export async function routeAndCompose(message: InboundMessage, effectiveText: string | undefined, history: Turn[], sessionProfile: SessionProfile | undefined, deps: AgentDeps, tasksBefore?: Task[], promised?: Commitment[]): Promise<ComposedReply> {
   trace(deps.tracer, "router", "route");
   let decision: RouterDecision;
   try {
@@ -70,6 +75,22 @@ export async function routeAndCompose(message: InboundMessage, effectiveText: st
     decision = { intent: "general", needsRAG: false, needsTool: false, escalate: false, confidence: 0 };
   }
 
+  // M27: a view that can't be worked out mustn't cost the reply, nor widen what it can do.
+  const viewInput = { message, decision, history, tasks: tasksBefore ?? [], commitments: promised ?? [] };
+  let view: TurnView | undefined;
+  let viewFailed = false as boolean;
+  if (deps.viewFor) {
+    try {
+      view = await deps.viewFor(viewInput);
+    } catch {
+      viewFailed = true;
+    }
+  }
+  const allowedTools = viewFailed ? (deps.tools ?? []).filter((t) => t.readOnly).map((t) => t.name) : view?.tools;
+  const reachable = (name: string) => !allowedTools || allowedTools.includes(name);
+  const taskOptions = deps.taskTtlMs !== undefined ? { ttlMs: deps.taskTtlMs } : {};
+  let tasks = tasksBefore && view?.move ? moveTasks(tasksBefore, view.move, deps.clock.now(), taskOptions) : tasksBefore;
+
   const confident = decision.confidence >= (deps.confidenceThreshold ?? 0.3);
   const budget = deps.contextBudget ?? DEFAULT_CONTEXT_BUDGET;
 
@@ -80,9 +101,10 @@ export async function routeAndCompose(message: InboundMessage, effectiveText: st
     if (skill) {
       trace(deps.tracer, "skill", "selected", { skill: skill.name });
       skillFragments.push(skill.promptFragment);
-      skillToolNames = skill.tools ?? [];
+      skillToolNames = (skill.tools ?? []).filter(reachable);
     }
   }
+  skillFragments.push(...(view?.notes ?? []));
 
   // Tool-invocation findings are typically more directly actionable (e.g. "order 8842: shipped")
   // than generic RAG recall, so they're kept in their own array and placed AHEAD of recalledSnippets
@@ -105,11 +127,11 @@ export async function routeAndCompose(message: InboundMessage, effectiveText: st
       trace(deps.tracer, "tools", "invoke");
       // Uses the same bounded/truncated text every other consumer (router, RAG query, selectTools,
       // the persisted turn) already uses — not the raw, unbounded message.
-      const findings = await safeCall(() => deps.invokeTools!({ message: { ...message, text: effectiveText }, decision, history }), []);
+      const findings = await safeCall(() => deps.invokeTools!({ message: { ...message, text: effectiveText }, decision, history, ...(allowedTools ? { allowedTools } : {}) }), []);
       toolFindings.push(...findings.map((f) => `Tool result: ${f}`));
     }
     if (deps.tools && deps.tools.length > 0) {
-      const selected = selectTools({ tools: deps.tools, message: effectiveText ?? "", alwaysInclude: skillToolNames, maxTokens: Math.floor(budget.promptBudget * TOOL_SCHEMAS_BUDGET_FRACTION) });
+      const selected = selectTools({ tools: deps.tools.filter((t) => reachable(t.name)), message: effectiveText ?? "", alwaysInclude: skillToolNames, maxTokens: Math.floor(budget.promptBudget * TOOL_SCHEMAS_BUDGET_FRACTION) });
       toolSchemas.push(...selected.map((t) => JSON.stringify({ name: t.name, description: t.description, parameters: t.parameters })));
     }
   }
@@ -129,8 +151,8 @@ export async function routeAndCompose(message: InboundMessage, effectiveText: st
   const composed = await composeWithBudget({
     model: deps.model,
     input: {
-      system: [deps.instructions?.trim(), SCOPE_GUARDRAIL, FORMAT_REASONING, GROUNDING_HONESTY].filter(Boolean).join("\n\n"),
-      sessionProfile: renderSessionProfile(sessionProfile),
+      system: [(view?.instructions ?? deps.instructions)?.trim(), SCOPE_GUARDRAIL, FORMAT_REASONING, GROUNDING_HONESTY].filter(Boolean).join("\n\n"),
+      sessionProfile: renderSessionProfile(sessionProfile, view?.memory),
       skillFragments,
       toolSchemas,
       summary: windowed.summary,
@@ -145,6 +167,13 @@ export async function routeAndCompose(message: InboundMessage, effectiveText: st
   // this compose step is exactly one such call (retries/shrinks happen inside composeWithBudget).
   trace(deps.tracer, "llm", "compose", { usage: composed.usage, dropped: composed.dropped, shrunkForContextLength: composed.shrunkForContextLength, formatRationale: composed.formatRationale });
   // M13: this same compose call drafted the extraction, for free.
-  const reply = await withConfirmButtons(composed.reply, message.contactId, pendingBefore, deps);
-  return { reply, extracted: { facts: composed.sessionFacts, currentState: composed.sessionCurrentState, summary: composed.sessionSummary } };
+  let review: ReplyReview | undefined;
+  if (deps.reviewReply) {
+    trace(deps.tracer, "llm", "review");
+    review = await safeCall(async () => deps.reviewReply!({ ...viewInput, tasks: tasks ?? [], reply: composed.reply, given: [...toolFindings, ...recalledSnippets] }), undefined);
+    if (tasks && review?.move) tasks = moveTasks(tasks, review.move, deps.clock.now(), taskOptions);
+  }
+  // After the review: Confirm / Cancel can't depend on a rewrite keeping them.
+  const reply = await withConfirmButtons(review?.reply ?? composed.reply, message.contactId, pendingBefore, deps);
+  return { reply, extracted: { facts: composed.sessionFacts, currentState: composed.sessionCurrentState, summary: composed.sessionSummary }, ...(tasks ? { tasks } : {}), ...(review?.commitments ? { commitments: review.commitments } : {}) };
 }

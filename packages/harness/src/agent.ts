@@ -1,9 +1,9 @@
-import type { Agent, Clock, DeliveryResult, InboundMessage, MessageChannel, Memory, Model, Router, RouterDecision, SessionProfileStore, SmartMessage, TracedSystem, Tool, Tracer, Turn } from "@wappy_ai/core";
+import type { Agent, Clock, Commitment, CommitmentStore, DeliveryResult, InboundMessage, MessageChannel, Memory, Model, Router, RouterDecision, SessionProfileStore, SmartMessage, Task, TaskMove, TaskStore, TracedSystem, Tool, Tracer, Turn } from "@wappy_ai/core";
 import { boundInboundText, DEFAULT_INBOUND_TEXT_LIMITS, type InboundTextLimits } from "./bound-inbound-text.js";
 import type { ContextBudget } from "./context-budget.js";
 import type { SkillRegistry } from "./skills.js";
 import { parseConfirmSelection, type ConfirmFlow } from "./confirm.js";
-import { safeAppend, safeCall, safeLoad, safeLoadSessionProfile, safeSetSessionProfile, summarizeReply, trace } from "./agent-support.js";
+import { liveFacts, safeAppend, safeCall, safeLoad, safeLoadSessionProfile, safeSetSessionProfile, summarizeReply, trace } from "./agent-support.js";
 import { resolvePendingConfirmation } from "./agent-confirm.js";
 import { routeAndCompose, type ComposedReply } from "./agent-compose.js";
 
@@ -21,6 +21,44 @@ const DEFAULT_SESSION_PROFILE_TTL_MS = 30 * 60 * 1000;
  * `channel.name` verbatim) so a customized channel name can't inject an out-of-union label into
  * `tracer.touched()`/`events()`. */
 const KNOWN_TRACED_CHANNELS: ReadonlySet<string> = new Set<TracedSystem>(["whatsapp"]);
+
+/** M27: what the view hook knows when it runs. */
+export interface ViewInput {
+  message: InboundMessage;
+  decision: RouterDecision;
+  history: Turn[];
+  tasks: Task[];
+  commitments: Commitment[];
+}
+
+/** M27: what one reply sees. Each part left out keeps the agent's default. */
+export interface TurnView {
+  /** Replaces `AgentDeps.instructions` for this reply. */
+  instructions?: string;
+  /** Extra context for this reply, placed with the skill fragments. */
+  notes?: string[];
+  /** The only tools this reply can reach, by selection, schema and invocation. */
+  tools?: string[];
+  /** The only remembered facts this reply can read. */
+  memory?: string[];
+  /** What this message does to the contact's tasks. */
+  move?: TaskMove;
+}
+
+export interface ReviewInput extends ViewInput {
+  reply: SmartMessage;
+  /** What the reply was given to work from: tool results and retrieved text. */
+  given: string[];
+}
+
+export interface ReplyReview {
+  /** Replaces the reply. Left out, it goes as composed. */
+  reply?: SmartMessage;
+  /** Promises this reply makes. Logged once it has been sent. */
+  commitments?: { kind: string; text: string }[];
+  /** What the reply did to the task, known only now that its tools have run. */
+  move?: TaskMove;
+}
 
 export interface AgentDeps {
   channel: MessageChannel;
@@ -40,7 +78,7 @@ export interface AgentDeps {
   /** RAG hook — default: no-op (no extra context). Real implementation (§9 Scenario B): `knowledge.ts`'s `createKnowledgeRag()` (M8). */
   retrieveRag?: (input: { contactId: string; query: string }) => Promise<string[]>;
   /** Tool-invocation hook — default: no-op (no findings). Real implementation (§9 Scenario C): `invoke-tools.ts`'s `createToolInvoker()` (M8). */
-  invokeTools?: (input: { message: InboundMessage; decision: RouterDecision; history?: Turn[] }) => Promise<string[]>;
+  invokeTools?: (input: { message: InboundMessage; decision: RouterDecision; history?: Turn[]; allowedTools?: string[] }) => Promise<string[]>;
   /** Pool available for runtime BM25 selection (T6.5) when a message needsTool — declaring available
    * tools to the model (for the prompt's textual tool-schema disclosure) is separate from actually
    * invoking one (that's `invokeTools`, e.g. `createToolInvoker({tools, ...})` using this same pool). Default []. */
@@ -57,6 +95,20 @@ export interface AgentDeps {
    * to know — placed at the start of every reply's system prompt, whatever the router picked.
    * Unset or empty = nothing added (the behaviour before M19). Counts toward the prompt budget. */
   instructions?: string;
+  /** M27: what each contact is in the middle of. Unset = no tasks are read, moved or written. */
+  taskStore?: TaskStore;
+  /** How long an untouched task lasts. Default 7 days. */
+  taskTtlMs?: number;
+  /** M27: what the business has promised each contact. Unset = nothing is read or logged. */
+  commitmentStore?: CommitmentStore;
+  /** M27: what this message's reply should see and may do. Runs after routing. Unset = the agent's
+   * own instructions and every tool. If it throws, the reply still goes out, on the agent's own
+   * instructions with only read-only tools: when unsure about an action, don't take it. */
+  viewFor?: (input: ViewInput) => TurnView | undefined | Promise<TurnView | undefined>;
+  /** M27: a last look at the reply before it's sent. If it throws, the reply goes out as composed. */
+  reviewReply?: (input: ReviewInput) => ReplyReview | undefined | Promise<ReplyReview | undefined>;
+  /** M27: how long a fact stays once learned, by name; undefined = as long as the profile lasts. */
+  factLifetimeMs?: (fact: string) => number | undefined;
   /** Bounds the whole assembled prompt (T6.1/T6.2); default is a conservative, model-agnostic budget. */
   contextBudget?: ContextBudget;
   /** Turns kept verbatim in the prompt; older history is summarized (T6.3). Default 20. */
@@ -127,7 +179,7 @@ async function handleOne(message: InboundMessage, deps: AgentDeps): Promise<Deli
   const history = await safeLoad(deps.memory, message.contactId);
   // M13: read alongside memory.load() — deps.clock.now() drives the TTL check inside get(), so an
   // expired profile comes back as undefined here, not stale state from a prior session.
-  const sessionProfile = await safeLoadSessionProfile(deps.sessionProfileStore, message.contactId, deps.clock.now());
+  const sessionProfile = liveFacts(await safeLoadSessionProfile(deps.sessionProfileStore, message.contactId, deps.clock.now()), deps.clock.now(), deps.factLifetimeMs);
 
   // The idempotency marker is the REPLY turn, not the inbound one: the inbound turn is persisted
   // unconditionally below, long before the message is actually answered, so checking for it would
@@ -165,6 +217,11 @@ async function handleOne(message: InboundMessage, deps: AgentDeps): Promise<Deli
   // M13: only set on the compose path (refusal/confirm replies don't route through the model, so
   // there's nothing to extract) — merged over the existing profile, not replacing it, when written below.
   let extracted: ComposedReply["extracted"] = {};
+  // M27: both undefined when their store isn't set, which is what keeps this path unchanged then.
+  const tasksBefore = deps.taskStore ? await safeCall(() => deps.taskStore!.list(message.contactId, deps.clock.now()), []) : undefined;
+  const promised = deps.commitmentStore ? await safeCall(() => deps.commitmentStore!.list(message.contactId), []) : undefined;
+  let tasksAfter = tasksBefore;
+  let commitments: ComposedReply["commitments"];
   if (bounded?.refuse) {
     reply = { text: REFUSAL_TEXT };
   } else if (parsedConfirm) {
@@ -176,7 +233,7 @@ async function handleOne(message: InboundMessage, deps: AgentDeps): Promise<Deli
     // M16: a skill answered directly — no routing, no model call. Persist/dedupe/send below as usual.
     reply = direct;
   } else {
-    ({ reply, extracted } = await routeAndCompose(message, effectiveText, history, sessionProfile, deps));
+    ({ reply, extracted, tasks: tasksAfter, commitments } = await routeAndCompose(message, effectiveText, history, sessionProfile, deps, tasksBefore, promised));
   }
 
   const channelSystem = KNOWN_TRACED_CHANNELS.has(deps.channel.name) ? (deps.channel.name as TracedSystem) : undefined;
@@ -201,6 +258,10 @@ async function handleOne(message: InboundMessage, deps: AgentDeps): Promise<Deli
   if (result.status === "sent" || result.status === "fellBack") {
     await safeAppend(deps.memory, { id: replyTurnId, contactId: message.contactId, role: "agent", text: summarizeReply(reply), timestamp: deps.clock.now() });
 
+    // M27: only now, so a send that failed and gets retried can't apply a move or a promise twice.
+    if (deps.taskStore && tasksAfter && tasksAfter !== tasksBefore) await safeCall(() => deps.taskStore!.save(message.contactId, tasksAfter!), undefined);
+    if (deps.commitmentStore) for (const [i, c] of (commitments ?? []).entries()) await safeCall(() => deps.commitmentStore!.log({ id: `${message.id}:c${i}`, contactId: message.contactId, kind: c.kind, text: c.text, at: deps.clock.now() }), undefined);
+
     // M13: written at the same point the reply gets persisted — facts MERGE (a fact once learned
     // isn't lost just because this turn didn't re-state it), currentState/summary REPLACE wholesale
     // when this turn produced a new one (else carried over as-is — "allowed to lag", not forced to
@@ -215,6 +276,7 @@ async function handleOne(message: InboundMessage, deps: AgentDeps): Promise<Deli
         ...(nextCurrentState !== undefined ? { currentState: nextCurrentState } : {}),
         ...(nextSummary !== undefined ? { summary: nextSummary } : {}),
         expiresAt: now + (deps.sessionProfileTtlMs ?? DEFAULT_SESSION_PROFILE_TTL_MS),
+        ...(deps.factLifetimeMs ? { factsAt: { ...sessionProfile?.factsAt, ...Object.fromEntries(Object.keys(extracted.facts ?? {}).map((k) => [k, now])) } } : {}),
       });
     }
   }

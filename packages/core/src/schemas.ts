@@ -160,8 +160,43 @@ export const SessionProfileSchema = z.object({
   currentState: z.string().optional(),
   summary: z.string().optional(),
   expiresAt: z.number(),
+  /** M27: when each fact was learned, for facts with their own lifetime. */
+  factsAt: z.record(z.string(), z.number()).optional(),
 });
 export type SessionProfile = z.infer<typeof SessionProfileSchema>;
+
+/** M27: something a contact is in the middle of. Survives restarts; can be paused and picked up again. */
+export const TaskSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  mode: z.string().optional(),
+  /** What's been gathered so far, kept so the task can resume. */
+  state: z.record(z.string(), z.string()),
+  status: z.enum(["active", "paused"]),
+  startedAt: z.number(),
+  updatedAt: z.number(),
+  expiresAt: z.number(),
+});
+export type Task = z.infer<typeof TaskSchema>;
+
+/** M27: what this message does to a contact's tasks. */
+export const TaskMoveSchema = z.discriminatedUnion("op", [
+  z.object({ op: z.literal("start"), name: z.string().min(1), mode: z.string().optional(), state: z.record(z.string(), z.string()).optional() }),
+  z.object({ op: z.literal("update"), state: z.record(z.string(), z.string()) }),
+  z.object({ op: z.literal("resume"), name: z.string().min(1) }),
+  z.object({ op: z.literal("finish") }),
+]);
+export type TaskMove = z.infer<typeof TaskMoveSchema>;
+
+/** M27: something the business has promised a contact. Logged, never edited. */
+export const CommitmentSchema = z.object({
+  id: z.string().min(1),
+  contactId: z.string().min(1),
+  kind: z.string().min(1),
+  text: z.string().min(1),
+  at: z.number(),
+});
+export type Commitment = z.infer<typeof CommitmentSchema>;
 
 export const ToolResultSchema = z.object({
   toolName: z.string().min(1),
